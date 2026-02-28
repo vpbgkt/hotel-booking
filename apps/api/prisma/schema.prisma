@@ -1,0 +1,543 @@
+// BlueStay Prisma Schema
+// Multi-tenant hotel booking platform
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// HOTEL & DOMAIN
+// ============================================================================
+
+/// Hotel entity - represents a partner hotel
+model Hotel {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique // URL-friendly identifier
+  description String?  @db.Text
+  
+  // Location
+  address     String
+  city        String
+  state       String
+  country     String   @default("India")
+  pincode     String
+  latitude    Float?
+  longitude   Float?
+  
+  // Contact
+  phone       String
+  email       String
+  whatsapp    String?
+  
+  // Branding
+  logoUrl     String?
+  heroImageUrl String?
+  
+  // Configuration
+  starRating       Int      @default(3) // 1-5
+  bookingModel     BookingModel @default(DAILY)
+  checkInTime      String   @default("14:00")
+  checkOutTime     String   @default("12:00")
+  hourlyMinHours   Int      @default(3)
+  hourlyMaxHours   Int      @default(12)
+  
+  // Commission
+  commissionRate   Float    @default(0.10) // 10% default
+  commissionType   CommissionType @default(PERCENTAGE)
+  
+  // Payment gateway accounts
+  razorpayAccountId String?
+  stripeAccountId   String?
+  
+  // Theme customization
+  themeConfig      Json?   // { primaryColor, fontFamily, etc. }
+  
+  // Status
+  isActive         Boolean @default(true)
+  isFeatured       Boolean @default(false)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  domains     HotelDomain[]
+  roomTypes   RoomType[]
+  rooms       Room[]
+  bookings    Booking[]
+  users       User[]
+  reviews     Review[]
+  media       Media[]
+  seoMeta     SEOMeta[]
+  commissions Commission[]
+  
+  @@index([city])
+  @@index([isActive, isFeatured])
+}
+
+/// Domain mapping for multi-tenant routing
+model HotelDomain {
+  id        String   @id @default(uuid())
+  hotelId   String
+  hotel     Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  domain    String   @unique // e.g., "radhikaresort.in"
+  isPrimary Boolean  @default(false)
+  sslStatus SSLStatus @default(PENDING)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([domain])
+}
+
+// ============================================================================
+// ROOMS & INVENTORY
+// ============================================================================
+
+/// Room type (e.g., "Deluxe Ocean View", "Standard Room")
+model RoomType {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  name        String
+  slug        String
+  description String?  @db.Text
+  
+  // Pricing
+  basePriceDaily   Float // Price per night
+  basePriceHourly  Float? // Price per hour (null if daily only)
+  
+  // Capacity
+  maxGuests        Int @default(2)
+  maxExtraGuests   Int @default(0)
+  extraGuestCharge Float @default(0)
+  
+  // Inventory
+  totalRooms       Int @default(1) // Total physical rooms of this type
+  
+  // Features
+  amenities        String[] // ["wifi", "ac", "pool-access"]
+  images           String[] // CDN URLs
+  
+  // Booking settings (override hotel defaults)
+  bookingModelOverride BookingModel?
+  minHours         Int?
+  maxHours         Int?
+  
+  // Status
+  isActive         Boolean @default(true)
+  sortOrder        Int @default(0)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  rooms        Room[]
+  inventory    RoomInventory[]
+  hourlySlots  HourlySlot[]
+  bookings     Booking[]
+  
+  @@unique([hotelId, slug])
+  @@index([hotelId, isActive])
+}
+
+/// Physical room instance
+model Room {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  roomTypeId  String
+  roomType    RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  
+  roomNumber  String   // "101", "202A"
+  floor       Int      @default(1)
+  status      RoomStatus @default(AVAILABLE)
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  bookings    Booking[]
+  
+  @@unique([hotelId, roomNumber])
+  @@index([hotelId, roomTypeId, status])
+}
+
+/// Daily inventory (one row per room_type per date)
+model RoomInventory {
+  id            String   @id @default(uuid())
+  roomTypeId    String
+  roomType      RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  
+  date          DateTime @db.Date
+  availableCount Int     @default(0) // Decremented on booking
+  priceOverride Float?   // null = use base_price_daily
+  minStayNights Int      @default(1)
+  isClosed      Boolean  @default(false) // Manually block date
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([roomTypeId, date])
+  @@index([roomTypeId, date])
+}
+
+/// Hourly slots for hourly booking mode
+model HourlySlot {
+  id            String   @id @default(uuid())
+  roomTypeId    String
+  roomType      RoomType @relation(fields: [roomTypeId], references: [id], onDelete: Cascade)
+  
+  date          DateTime @db.Date
+  slotStart     String   // "08:00"
+  slotEnd       String   // "11:00"
+  availableCount Int     @default(0)
+  priceOverride Float?   // per hour override
+  isClosed      Boolean  @default(false)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([roomTypeId, date, slotStart, slotEnd])
+  @@index([roomTypeId, date])
+}
+
+// ============================================================================
+// BOOKINGS & PAYMENTS
+// ============================================================================
+
+/// Booking record
+model Booking {
+  id              String   @id @default(uuid())
+  bookingNumber   String   @unique // "BK-20260315-X7K9"
+  
+  hotelId         String
+  hotel           Hotel    @relation(fields: [hotelId], references: [id])
+  guestId         String
+  guest           User     @relation(fields: [guestId], references: [id])
+  roomTypeId      String
+  roomType        RoomType @relation(fields: [roomTypeId], references: [id])
+  assignedRoomId  String?
+  assignedRoom    Room?    @relation(fields: [assignedRoomId], references: [id])
+  
+  // Booking type
+  bookingType     BookingType @default(DAILY)
+  
+  // Daily booking
+  checkInDate     DateTime @db.Date
+  checkOutDate    DateTime? @db.Date
+  
+  // Hourly booking
+  checkInTime     String?  // "14:00"
+  checkOutTime    String?  // "17:00"
+  numHours        Int?
+  
+  // Quantities
+  numRooms        Int @default(1)
+  numGuests       Int @default(1)
+  numExtraGuests  Int @default(0)
+  
+  // Pricing
+  roomTotal       Float
+  extraGuestTotal Float @default(0)
+  taxes           Float @default(0)
+  discountAmount  Float @default(0)
+  totalAmount     Float
+  
+  // Commission (for BlueStay bookings)
+  commissionAmount Float @default(0)
+  hotelPayout      Float @default(0)
+  
+  // Source & status
+  source          BookingSource @default(DIRECT)
+  status          BookingStatus @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  
+  // Cancellation
+  cancellationReason String?
+  cancelledAt     DateTime?
+  
+  // Guest info (denormalized for quick access)
+  guestName       String
+  guestEmail      String
+  guestPhone      String
+  specialRequests String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  payments        Payment[]
+  review          Review?
+  commission      Commission?
+  
+  @@index([hotelId, status])
+  @@index([guestId])
+  @@index([checkInDate])
+  @@index([bookingNumber])
+}
+
+/// Payment record
+model Payment {
+  id              String   @id @default(uuid())
+  bookingId       String
+  booking         Booking  @relation(fields: [bookingId], references: [id])
+  
+  gateway         PaymentGateway
+  gatewayPaymentId String? // "pay_xxxxx"
+  gatewayOrderId  String?  // "order_xxxxx"
+  
+  amount          Float
+  currency        String   @default("INR")
+  status          TransactionStatus @default(CREATED)
+  
+  refundAmount    Float    @default(0)
+  refundId        String?
+  
+  metadata        Json?    // Full gateway response
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([bookingId])
+  @@index([gatewayPaymentId])
+}
+
+// ============================================================================
+// USERS & AUTH
+// ============================================================================
+
+/// User account (guests, hotel admins, platform admins)
+model User {
+  id            String   @id @default(uuid())
+  
+  email         String?  @unique
+  phone         String?  @unique
+  password      String?  // Hashed, null for OTP-only users
+  
+  name          String
+  avatarUrl     String?
+  
+  role          UserRole @default(GUEST)
+  hotelId       String?  // null for guests and platform admins
+  hotel         Hotel?   @relation(fields: [hotelId], references: [id])
+  
+  isActive      Boolean  @default(true)
+  emailVerified Boolean  @default(false)
+  phoneVerified Boolean  @default(false)
+  
+  lastLoginAt   DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  bookings      Booking[]
+  reviews       Review[]
+  
+  @@index([email])
+  @@index([phone])
+  @@index([hotelId, role])
+}
+
+// ============================================================================
+// REVIEWS & RATINGS
+// ============================================================================
+
+/// Guest reviews
+model Review {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id])
+  bookingId   String   @unique
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  guestId     String
+  guest       User     @relation(fields: [guestId], references: [id])
+  
+  rating      Int      // 1-5
+  title       String?
+  comment     String?  @db.Text
+  photos      String[] // CDN URLs
+  
+  hotelReply  String?  @db.Text
+  
+  isVerified  Boolean  @default(true) // Stayed at hotel
+  isPublished Boolean  @default(false) // Moderation
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([hotelId, isPublished])
+  @@index([guestId])
+}
+
+// ============================================================================
+// COMMISSION & PAYMENTS TO HOTELS
+// ============================================================================
+
+/// Commission ledger for BlueStay bookings
+model Commission {
+  id              String   @id @default(uuid())
+  hotelId         String
+  hotel           Hotel    @relation(fields: [hotelId], references: [id])
+  bookingId       String   @unique
+  booking         Booking  @relation(fields: [bookingId], references: [id])
+  
+  bookingAmount   Float    // Total booking amount
+  commissionRate  Float    // Rate at time of booking
+  commissionAmount Float
+  
+  status          SettlementStatus @default(PENDING)
+  settledAt       DateTime?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([hotelId, status])
+}
+
+// ============================================================================
+// SEO & MEDIA
+// ============================================================================
+
+/// Custom SEO metadata per page per hotel
+model SEOMeta {
+  id            String   @id @default(uuid())
+  hotelId       String
+  hotel         Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  pageSlug      String   // "homepage", "rooms", "rooms/deluxe"
+  metaTitle     String?
+  metaDescription String?
+  ogImageUrl    String?
+  customJsonLd  Json?
+  canonicalUrl  String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([hotelId, pageSlug])
+}
+
+/// Media files (images, videos)
+model Media {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  url         String
+  thumbnailUrl String?
+  type        MediaType @default(IMAGE)
+  category    MediaCategory @default(HOTEL)
+  altText     String?
+  
+  sortOrder   Int @default(0)
+  width       Int?
+  height      Int?
+  sizeBytes   Int?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([hotelId, category])
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum BookingModel {
+  DAILY
+  HOURLY
+  BOTH
+}
+
+enum BookingType {
+  DAILY
+  HOURLY
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FLAT
+}
+
+enum SSLStatus {
+  PENDING
+  ACTIVE
+  FAILED
+}
+
+enum RoomStatus {
+  AVAILABLE
+  MAINTENANCE
+  BLOCKED
+}
+
+enum BookingSource {
+  DIRECT      // Booked on hotel's own domain
+  BLUESTAY    // Booked via bluestay.in
+  WALK_IN     // Walk-in booking added by staff
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CHECKED_IN
+  CHECKED_OUT
+  CANCELLED
+  NO_SHOW
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  PARTIALLY_REFUNDED
+  REFUNDED
+  FAILED
+}
+
+enum PaymentGateway {
+  RAZORPAY
+  STRIPE
+  CASH
+}
+
+enum TransactionStatus {
+  CREATED
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  REFUNDED
+}
+
+enum UserRole {
+  GUEST
+  HOTEL_ADMIN
+  HOTEL_STAFF
+  PLATFORM_ADMIN
+}
+
+enum SettlementStatus {
+  PENDING
+  SETTLED
+  DISPUTED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum MediaCategory {
+  HOTEL
+  ROOM
+  AMENITY
+  GALLERY
+}

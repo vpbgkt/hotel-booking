@@ -1,0 +1,148 @@
+import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import "@/styles/globals.css";
+import { Toaster } from "sonner";
+import { ApolloWrapper } from "@/lib/graphql";
+import { AuthProvider } from "@/lib/auth/auth-context";
+
+/**
+ * Inter font configuration
+ * Using variable font for optimal performance and flexibility
+ */
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-inter",
+});
+
+/**
+ * Default metadata for the application
+ * This is overridden per-page and per-tenant
+ */
+export const metadata: Metadata = {
+  title: {
+    default: "BlueStay - Book Hotels Across India",
+    template: "%s | BlueStay",
+  },
+  description:
+    "Discover and book the best hotels across India. Book directly with hotels for the best prices. Compare rooms, amenities, and reviews.",
+  keywords: [
+    "hotels",
+    "booking",
+    "india",
+    "travel",
+    "accommodation",
+    "resorts",
+    "rooms",
+  ],
+  authors: [{ name: "BlueStay" }],
+  creator: "BlueStay",
+  publisher: "BlueStay",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  ),
+  openGraph: {
+    type: "website",
+    locale: "en_IN",
+    siteName: "BlueStay",
+    title: "BlueStay - Book Hotels Across India",
+    description:
+      "Discover and book the best hotels across India. Book directly with hotels for the best prices.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "BlueStay - Book Hotels Across India",
+    description:
+      "Discover and book the best hotels across India. Book directly with hotels for the best prices.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+/**
+ * Viewport configuration for mobile optimization
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
+  ],
+};
+
+/**
+ * Root Layout Component
+ * 
+ * This is the top-level layout that wraps all pages.
+ * It sets up:
+ * - Font configuration
+ * - Global providers (toast notifications)
+ * - HTML structure with proper lang attribute
+ */
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Preconnect to external resources for faster loading */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        {/* PWA manifest will be added later */}
+        <link rel="manifest" href="/manifest.json" />
+        {/* Apple touch icon for iOS */}
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+      </head>
+      <body
+        className={`${inter.variable} font-sans antialiased min-h-screen bg-white`}
+      >
+        {/* Apollo GraphQL Provider */}
+        <ApolloWrapper>
+          {/* Auth Provider - manages user session */}
+          <AuthProvider>
+            {/* Main application content */}
+            {children}
+          </AuthProvider>
+        </ApolloWrapper>
+
+        {/* Toast notifications - positioned bottom-right on desktop, bottom on mobile */}
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            style: {
+              background: "white",
+              border: "1px solid #e5e7eb",
+              boxShadow:
+                "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+            },
+            className: "text-sm",
+          }}
+          richColors
+          closeButton
+        />
+      </body>
+    </html>
+  );
+}
