@@ -21,6 +21,9 @@ import {
   LogOut,
   ChevronLeft,
   Loader2,
+  IndianRupee,
+  FileText,
+  Search,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +42,26 @@ const adminLinks = [
     label: 'Rooms',
     href: '/admin/rooms',
     icon: BedDouble,
+  },
+  {
+    label: 'Pricing',
+    href: '/admin/pricing',
+    icon: IndianRupee,
+  },
+  {
+    label: 'Analytics',
+    href: '/admin/analytics',
+    icon: BarChart3,
+  },
+  {
+    label: 'Content',
+    href: '/admin/content',
+    icon: FileText,
+  },
+  {
+    label: 'SEO',
+    href: '/admin/seo',
+    icon: Search,
   },
   {
     label: 'Hotel Settings',

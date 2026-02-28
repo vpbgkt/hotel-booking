@@ -70,7 +70,8 @@ export default function AdminRoomsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingRoom, setEditingRoom] = useState<RoomType | null>(null);
 
-  const { data, loading, error, refetch } = useQuery(GET_ADMIN_ROOM_TYPES, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, loading, error, refetch } = useQuery<any>(GET_ADMIN_ROOM_TYPES, {
     variables: { hotelId },
     skip: !hotelId,
   });
@@ -203,7 +204,7 @@ export default function AdminRoomsPage() {
     });
   };
 
-  const roomTypes: RoomType[] = data?.adminRoomTypes || [];
+  const roomTypes: RoomType[] = (data as any)?.adminRoomTypes || [];
 
   if (!hotelId) {
     return (

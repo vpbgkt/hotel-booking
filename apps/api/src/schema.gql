@@ -2,6 +2,15 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+type AdminAnalytics {
+  averageBookingValue: Float!
+  averageStayNights: Float!
+  bookingsBySource: [BookingsBySource!]!
+  bookingsByStatus: [BookingsByStatus!]!
+  monthlyData: [MonthlyDataPoint!]!
+  roomTypePopularity: [RoomTypePopularity!]!
+}
+
 type AdminDashboardStats {
   monthlyBookings: Int!
   monthlyRevenue: Float!
@@ -144,6 +153,43 @@ enum BookingType {
   HOURLY
 }
 
+type BookingsBySource {
+  count: Int!
+  source: String!
+}
+
+type BookingsByStatus {
+  count: Int!
+  status: String!
+}
+
+input BulkInventoryUpdateInput {
+  """Override available count"""
+  availableCount: Int
+  endDate: DateTime!
+
+  """Close/open dates for booking"""
+  isClosed: Boolean
+
+  """Minimum stay nights"""
+  minStayNights: Int
+
+  """Price override for the date range (null = use base price)"""
+  priceOverride: Float
+  roomTypeId: ID!
+  startDate: DateTime!
+}
+
+type BulkSettleResult {
+  count: Int!
+}
+
+type BulkUpdateResult {
+  daysUpdated: Int!
+  message: String!
+  success: Boolean!
+}
+
 type CalendarDay {
   available: Int!
   date: String!
@@ -181,6 +227,50 @@ input CheckHourlyAvailabilityInput {
   numRooms: Int! = 1
   roomTypeId: String
   startTime: String
+}
+
+type CityPerformance {
+  bookings: Int!
+  city: String!
+  revenue: Float!
+}
+
+type CommissionBookingInfo {
+  bookingNumber: String
+  guestName: String
+  status: String
+  totalAmount: Float
+}
+
+type CommissionEntry {
+  bookingAmount: Float!
+  bookingId: String!
+  bookingInfo: CommissionBookingInfo
+  commissionAmount: Float!
+  commissionRate: Float!
+  createdAt: DateTime!
+  hotelId: String!
+  hotelName: String
+  id: ID!
+  settledAt: DateTime
+  status: String!
+}
+
+input CommissionsFilter {
+  hotelId: String
+  limit: Int
+  page: Int
+  status: String
+}
+
+type CommissionsList {
+  commissions: [CommissionEntry!]!
+  hasMore: Boolean!
+  limit: Int!
+  page: Int!
+  total: Int!
+  totalBookingAmount: Float!
+  totalCommissionAmount: Float!
 }
 
 type ConfirmPaymentResult {
@@ -305,6 +395,15 @@ type Hotel {
   whatsapp: String
 }
 
+type HotelContentType {
+  description: String
+  heroImageUrl: String
+  id: ID!
+  logoUrl: String
+  name: String!
+  themeConfig: JSON
+}
+
 """Hotel domain mapping"""
 type HotelDomain {
   domain: String!
@@ -385,6 +484,25 @@ type InitiatePaymentResult {
   paymentId: String!
 }
 
+type InventoryCalendar {
+  basePriceDaily: Float!
+  calendar: [InventoryCalendarDay!]!
+  roomTypeId: String!
+  roomTypeName: String!
+  totalRooms: Int!
+}
+
+type InventoryCalendarDay {
+  available: Int!
+  basePrice: Float!
+  date: String!
+  hasCustomAvailability: Boolean!
+  hasCustomPrice: Boolean!
+  isClosed: Boolean!
+  minStayNights: Int!
+  price: Float!
+}
+
 """
 The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
 """
@@ -401,7 +519,16 @@ type LogoutResponse {
   success: Boolean!
 }
 
+type MonthlyDataPoint {
+  bookings: Int!
+  month: String!
+  revenue: Float!
+}
+
 type Mutation {
+  """Bulk update pricing and availability for a date range"""
+  bulkUpdateInventory(input: BulkInventoryUpdateInput!): BulkUpdateResult!
+
   """Cancel a booking"""
   cancelBooking(input: CancelBookingInput!): Booking!
 
@@ -426,6 +553,9 @@ type Mutation {
   """Deactivate a room type (soft delete)"""
   deleteRoomType(id: ID!): DeleteResult!
 
+  """Delete SEO meta entry"""
+  deleteSeoMeta(id: ID!): DeleteResult!
+
   """Start payment process for a booking"""
   initiatePayment(bookingId: ID!, method: String! = "card"): InitiatePaymentResult!
 
@@ -434,6 +564,27 @@ type Mutation {
 
   """Logout and revoke refresh token"""
   logout: LogoutResponse!
+
+  """Approve a pending review"""
+  platformApproveReview(reviewId: ID!): Review!
+
+  """Bulk settle multiple commissions"""
+  platformBulkSettleCommissions(commissionIds: [ID!]!): BulkSettleResult!
+
+  """Delete a review"""
+  platformDeleteReview(reviewId: ID!): PlatformDeleteResult!
+
+  """Mark a commission as settled"""
+  platformSettleCommission(commissionId: ID!): CommissionEntry!
+
+  """Activate or deactivate a hotel"""
+  platformToggleHotelActive(hotelId: ID!, isActive: Boolean!): Hotel!
+
+  """Toggle hotel featured status"""
+  platformToggleHotelFeatured(hotelId: ID!, isFeatured: Boolean!): Hotel!
+
+  """Update hotel commission rate"""
+  platformUpdateHotelCommission(commissionRate: Float!, hotelId: ID!): Hotel!
 
   """Process refund for a cancelled booking"""
   processRefund(amount: Float, bookingId: ID!): RefundResult!
@@ -450,14 +601,23 @@ type Mutation {
   """Update booking status"""
   updateBookingStatus(input: UpdateBookingStatusInput!): Booking!
 
+  """Update inventory for a single date"""
+  updateDateInventory(input: SingleDateInventoryInput!): RoomInventory!
+
   """Update hotel details (admin only)"""
   updateHotel(input: UpdateHotelInput!): Hotel!
+
+  """Update hotel content and theme"""
+  updateHotelContent(input: UpdateHotelContentInput!): Hotel!
 
   """Update user profile"""
   updateProfile(input: UpdateProfileInput!): User!
 
   """Update an existing room type"""
   updateRoomType(input: UpdateRoomTypeInput!): RoomType!
+
+  """Create or update SEO meta for a page"""
+  upsertSeoMeta(input: UpsertSeoMetaInput!): SeoMetaType!
 
   """Verify OTP and login/register"""
   verifyOTP(input: VerifyOTPInput!): AuthResponse!
@@ -514,6 +674,115 @@ enum PaymentStatus {
   REFUNDED
 }
 
+type PendingReviewEntry {
+  comment: String
+  createdAt: DateTime!
+  guestEmail: String
+  guestName: String
+  hotelId: String!
+  hotelName: String
+  id: ID!
+  rating: Int!
+  title: String
+}
+
+type PendingReviewsList {
+  hasMore: Boolean!
+  reviews: [PendingReviewEntry!]!
+  total: Int!
+}
+
+type PlatformAnalytics {
+  cityPerformance: [CityPerformance!]!
+  monthlyRevenue: [PlatformMonthlyData!]!
+  sourceDistribution: [SourceDistribution!]!
+  topHotels: [TopHotelData!]!
+}
+
+type PlatformDashboardStats {
+  activeHotels: Int!
+  bookingGrowth: Int!
+  monthlyBookings: Int!
+  monthlyRevenue: Float!
+  pendingCommissions: Float!
+  recentBookings: [Booking!]!
+  recentHotels: [RecentHotelInfo!]!
+  totalBookings: Int!
+  totalCommissions: Float!
+  totalGuests: Int!
+  totalHotels: Int!
+  totalRevenue: Float!
+}
+
+type PlatformDeleteResult {
+  message: String!
+  success: Boolean!
+}
+
+type PlatformHotel {
+  address: String!
+  adminsCount: Int
+  averageRating: Float
+  bookingModel: BookingModel!
+  bookingsCount: Int
+  checkInTime: String!
+  checkOutTime: String!
+  city: String!
+  commissionRate: Float
+  country: String!
+  createdAt: DateTime!
+  description: String
+  domains: [HotelDomain!]
+  email: String!
+  heroImageUrl: String
+  hourlyMaxHours: Int!
+  hourlyMinHours: Int!
+  id: ID!
+  isActive: Boolean!
+  isFeatured: Boolean!
+  latitude: Float
+  logoUrl: String
+  longitude: Float
+  name: String!
+  phone: String!
+  pincode: String!
+  primaryDomain: String
+  reviewCount: Int
+  reviews: [Review!]
+  reviewsCount: Int
+  roomTypes: [RoomType!]
+  roomTypesCount: Int
+  slug: String!
+  starRating: Int!
+  startingPrice: Float
+  state: String!
+  themeConfig: JSON
+  updatedAt: DateTime!
+  whatsapp: String
+}
+
+input PlatformHotelsFilter {
+  city: String
+  isActive: Boolean
+  limit: Int
+  page: Int
+  search: String
+}
+
+type PlatformHotelsList {
+  hasMore: Boolean!
+  hotels: [PlatformHotel!]!
+  limit: Int!
+  page: Int!
+  total: Int!
+}
+
+type PlatformMonthlyData {
+  bookings: Int!
+  month: String!
+  revenue: Float!
+}
+
 type PopularCity {
   city: String!
   hotelCount: Int!
@@ -521,11 +790,23 @@ type PopularCity {
 }
 
 type Query {
+  """Get hotel analytics data"""
+  adminAnalytics(hotelId: ID!, months: Int = 6): AdminAnalytics!
+
   """Get dashboard stats for hotel admin"""
   adminDashboardStats(hotelId: ID!): AdminDashboardStats!
 
+  """Get hotel content (description, images, theme)"""
+  adminHotelContent(hotelId: ID!): HotelContentType!
+
+  """Get inventory calendar for admin pricing management"""
+  adminInventoryCalendar(endDate: DateTime!, roomTypeId: ID!, startDate: DateTime!): InventoryCalendar!
+
   """Get all room types for admin (including inactive)"""
   adminRoomTypes(hotelId: ID!): [RoomType!]!
+
+  """Get all SEO meta entries for a hotel"""
+  adminSeoMeta(hotelId: ID!): [SeoMetaType!]!
 
   """Get availability calendar for a room type"""
   availabilityCalendar(endDate: DateTime!, roomTypeId: ID!, startDate: DateTime!): AvailabilityCalendar!
@@ -572,6 +853,21 @@ type Query {
   """Get all payments for a booking"""
   paymentsByBooking(bookingId: ID!): [Payment!]!
 
+  """Get platform-wide analytics"""
+  platformAnalytics(months: Int = 6): PlatformAnalytics!
+
+  """List commissions with filters"""
+  platformCommissions(filters: CommissionsFilter): CommissionsList!
+
+  """Get platform-wide dashboard statistics"""
+  platformDashboardStats: PlatformDashboardStats!
+
+  """List all hotels with management info"""
+  platformHotels(filters: PlatformHotelsFilter): PlatformHotelsList!
+
+  """Get reviews pending moderation"""
+  platformPendingReviews(limit: Int = 20, page: Int = 1): PendingReviewsList!
+
   """Get popular cities"""
   popularCities(limit: Float = 10): [PopularCity!]!
 
@@ -586,6 +882,17 @@ type Query {
 
   """Get current user profile"""
   userProfile: User!
+}
+
+type RecentHotelInfo {
+  bookingsCount: Int!
+  city: String!
+  createdAt: DateTime!
+  id: ID!
+  isActive: Boolean!
+  name: String!
+  roomTypesCount: Int!
+  state: String!
 }
 
 """Refresh token input"""
@@ -636,6 +943,17 @@ type ReviewGuest {
   name: String!
 }
 
+"""Room inventory for a specific date"""
+type RoomInventory {
+  availableCount: Int!
+  date: DateTime!
+  id: ID!
+  isClosed: Boolean!
+  minStayNights: Int!
+  priceOverride: Float
+  roomTypeId: String!
+}
+
 """Room type entity"""
 type RoomType {
   amenities: [String!]!
@@ -680,6 +998,12 @@ input RoomTypeFiltersInput {
   minPrice: Float
 }
 
+type RoomTypePopularity {
+  bookings: Int!
+  revenue: Float!
+  roomTypeName: String!
+}
+
 type RoomTypeSummary {
   amenities: [String!]!
   basePriceDaily: Float!
@@ -690,10 +1014,46 @@ type RoomTypeSummary {
   slug: String!
 }
 
+type SeoMetaType {
+  canonicalUrl: String
+  createdAt: DateTime!
+  customJsonLd: JSON
+  hotelId: String!
+  id: ID!
+  metaDescription: String
+  metaTitle: String
+  ogImageUrl: String
+  pageSlug: String!
+  updatedAt: DateTime!
+}
+
+input SingleDateInventoryInput {
+  availableCount: Int
+  date: DateTime!
+  isClosed: Boolean
+  minStayNights: Int
+  priceOverride: Float
+  roomTypeId: ID!
+}
+
 """Sort order"""
 enum SortOrder {
   ASC
   DESC
+}
+
+type SourceDistribution {
+  count: Int!
+  revenue: Float!
+  source: String!
+}
+
+type TopHotelData {
+  city: String!
+  hotelId: String!
+  hotelName: String!
+  totalBookings: Int!
+  totalRevenue: Float!
 }
 
 """Input for updating booking status"""
@@ -701,6 +1061,16 @@ input UpdateBookingStatusInput {
   assignedRoomId: String
   bookingId: String!
   status: BookingStatus!
+}
+
+input UpdateHotelContentInput {
+  description: String
+  heroImageUrl: String
+  hotelId: ID!
+  logoUrl: String
+
+  """Theme config: { primaryColor, fontFamily, etc. }"""
+  themeConfig: JSON
 }
 
 input UpdateHotelInput {
@@ -746,6 +1116,20 @@ input UpdateRoomTypeInput {
   name: String
   sortOrder: Int
   totalRooms: Int
+}
+
+input UpsertSeoMetaInput {
+  canonicalUrl: String
+  customJsonLd: JSON
+  hotelId: ID!
+  metaDescription: String
+  metaTitle: String
+  ogImageUrl: String
+
+  """
+  Page identifier e.g. "homepage", "rooms", "contact"
+  """
+  pageSlug: String!
 }
 
 """User entity"""

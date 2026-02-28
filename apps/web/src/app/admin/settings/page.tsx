@@ -49,7 +49,8 @@ export default function AdminSettingsPage() {
   const hotelId = user?.hotelId;
   const [saved, setSaved] = useState(false);
 
-  const { data, loading, error } = useQuery(GET_HOTEL_BY_ID, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, loading, error } = useQuery<any>(GET_HOTEL_BY_ID, {
     variables: { id: hotelId },
     skip: !hotelId,
   });

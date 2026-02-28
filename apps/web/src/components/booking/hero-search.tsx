@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Search,
@@ -25,11 +26,24 @@ import { cn } from "@/lib/utils";
  * - Mobile-optimized with full-screen expansion
  */
 export function HeroSearch() {
+  const router = useRouter();
   const [bookingType, setBookingType] = React.useState<"daily" | "hourly">(
     "daily"
   );
   const [location, setLocation] = React.useState("");
   const [isFocused, setIsFocused] = React.useState(false);
+
+  const handleSearch = () => {
+    const params = new URLSearchParams();
+    if (location.trim()) {
+      params.set('search', location.trim());
+    }
+    router.push(`/hotels${params.toString() ? '?' + params.toString() : ''}`);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSearch();
+  };
 
   return (
     <motion.div
@@ -91,6 +105,7 @@ export function HeroSearch() {
                 onChange={(e) => setLocation(e.target.value)}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
+                onKeyDown={handleKeyDown}
                 className="w-full text-gray-900 placeholder-gray-400 focus:outline-none text-sm"
               />
             </div>
@@ -150,7 +165,7 @@ export function HeroSearch() {
 
           {/* Search Button */}
           <div className="pl-2">
-            <Button size="lg" className="h-12 px-8 rounded-xl shadow-lg shadow-brand-500/25">
+            <Button size="lg" onClick={handleSearch} className="h-12 px-8 rounded-xl shadow-lg shadow-brand-500/25">
               <Search size={18} />
               <span className="ml-2">Search</span>
             </Button>
@@ -170,6 +185,7 @@ export function HeroSearch() {
               placeholder="Where are you going?"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
+              onKeyDown={handleKeyDown}
               className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             />
           </div>
@@ -217,7 +233,7 @@ export function HeroSearch() {
           </button>
 
           {/* Search Button */}
-          <Button className="w-full h-12 rounded-xl shadow-lg shadow-brand-500/25">
+          <Button onClick={handleSearch} className="w-full h-12 rounded-xl shadow-lg shadow-brand-500/25">
             <Search size={18} />
             <span className="ml-2">Search Hotels</span>
           </Button>
@@ -230,6 +246,7 @@ export function HeroSearch() {
         {["Goa", "Mumbai", "Jaipur", "Udaipur", "Kerala"].map((city) => (
           <button
             key={city}
+            onClick={() => router.push(`/hotels?city=${encodeURIComponent(city)}`)}
             className="px-3 py-1 text-sm text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
           >
             {city}

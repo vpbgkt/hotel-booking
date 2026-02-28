@@ -141,3 +141,98 @@ export class UpdateRoomTypeInput {
   @Field({ nullable: true })
   isActive?: boolean;
 }
+
+@InputType()
+export class BulkInventoryUpdateInput {
+  @Field(() => ID)
+  roomTypeId: string;
+
+  @Field()
+  startDate: Date;
+
+  @Field()
+  endDate: Date;
+
+  @Field(() => Float, { nullable: true, description: 'Price override for the date range (null = use base price)' })
+  priceOverride?: number;
+
+  @Field(() => Int, { nullable: true, description: 'Override available count' })
+  availableCount?: number;
+
+  @Field({ nullable: true, description: 'Close/open dates for booking' })
+  isClosed?: boolean;
+
+  @Field(() => Int, { nullable: true, description: 'Minimum stay nights' })
+  minStayNights?: number;
+}
+
+@InputType()
+export class SingleDateInventoryInput {
+  @Field(() => ID)
+  roomTypeId: string;
+
+  @Field()
+  date: Date;
+
+  @Field(() => Float, { nullable: true })
+  priceOverride?: number;
+
+  @Field(() => Int, { nullable: true })
+  availableCount?: number;
+
+  @Field({ nullable: true })
+  isClosed?: boolean;
+
+  @Field(() => Int, { nullable: true })
+  minStayNights?: number;
+}
+
+// ============================================
+// SEO Meta
+// ============================================
+
+@InputType()
+export class UpsertSeoMetaInput {
+  @Field(() => ID)
+  hotelId: string;
+
+  @Field({ description: 'Page identifier e.g. "homepage", "rooms", "contact"' })
+  pageSlug: string;
+
+  @Field({ nullable: true })
+  metaTitle?: string;
+
+  @Field({ nullable: true })
+  metaDescription?: string;
+
+  @Field({ nullable: true })
+  ogImageUrl?: string;
+
+  @Field({ nullable: true })
+  canonicalUrl?: string;
+
+  @Field(() => GraphQLJSON, { nullable: true })
+  customJsonLd?: any;
+}
+
+// ============================================
+// Content / Theme
+// ============================================
+
+@InputType()
+export class UpdateHotelContentInput {
+  @Field(() => ID)
+  hotelId: string;
+
+  @Field({ nullable: true })
+  description?: string;
+
+  @Field({ nullable: true })
+  heroImageUrl?: string;
+
+  @Field({ nullable: true })
+  logoUrl?: string;
+
+  @Field(() => GraphQLJSON, { nullable: true, description: 'Theme config: { primaryColor, fontFamily, etc. }' })
+  themeConfig?: any;
+}

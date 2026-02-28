@@ -8,6 +8,7 @@ import { Metadata } from 'next';
 import { getClient } from '@/lib/graphql/client';
 import { GET_HOTELS, GET_POPULAR_CITIES } from '@/lib/graphql/queries/hotels';
 import { HotelGrid } from '@/components/hotels/hotel-grid';
+import { HotelSearchBar, HotelSort, HotelFilterSidebar, HotelPagination } from '@/components/hotels/hotel-search-controls';
 
 export const metadata: Metadata = {
   title: 'Hotels Across India - Find & Book Hotels',
@@ -90,7 +91,8 @@ async function getHotelsData(searchParams: Awaited<HotelsPageProps['searchParams
 
 export default async function HotelsPage({ searchParams }: HotelsPageProps) {
   const params = await searchParams;
-  const { hotels, cities } = await getHotelsData(params);
+  const { hotels } = await getHotelsData(params);
+  const currentPage = params.page ? parseInt(params.page) : 1;
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -99,10 +101,16 @@ export default async function HotelsPage({ searchParams }: HotelsPageProps) {
         <section className="bg-gradient-to-r from-brand-600 to-brand-700 py-8 md:py-12">
           <div className="container mx-auto px-4">
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-4">
-              Find Your Perfect Stay
+              {params.city
+                ? `Hotels in ${params.city}`
+                : params.search
+                  ? `Search results for "${params.search}"`
+                  : 'Find Your Perfect Stay'}
             </h1>
-            <div className="bg-white rounded-lg p-4 shadow-lg">
-              <p className="text-gray-600">Search coming soon...</p>
+            <div className="bg-white rounded-lg p-3 shadow-lg">
+              <Suspense fallback={<div className="h-11 bg-gray-100 rounded-lg animate-pulse" />}>
+                <HotelSearchBar />
+              </Suspense>
             </div>
           </div>
         </section>
@@ -111,35 +119,45 @@ export default async function HotelsPage({ searchParams }: HotelsPageProps) {
         <section className="py-8">
           <div className="container mx-auto px-4">
             <div className="flex flex-col lg:flex-row gap-8">
-              {/* Sidebar Filters (placeholder) */}
-              <aside className="lg:w-64 flex-shrink-0">
-                <div className="bg-white rounded-xl border border-gray-100 p-4">
-                  <h3 className="font-semibold text-gray-900 mb-4">Filters</h3>
-                  <p className="text-sm text-gray-500">Filter options coming soon...</p>
-                </div>
-              </aside>
+              {/* Sidebar Filters */}
+              <Suspense fallback={
+                <aside className="hidden lg:block lg:w-64 flex-shrink-0">
+                  <div className="bg-white rounded-xl border border-gray-100 p-4 animate-pulse h-96" />
+                </aside>
+              }>
+                <HotelFilterSidebar />
+              </Suspense>
               
               {/* Hotel Grid */}
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-6">
-                  <p className="text-gray-600">
-                    <span className="font-semibold text-gray-900">{hotels?.total || 0}</span> hotels found
-                    {params.city && <span> in {params.city}</span>}
-                  </p>
-                  <select 
-                    className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    defaultValue={params.sort || 'FEATURED'}
-                  >
-                    <option value="FEATURED">Featured</option>
-                    <option value="RATING">Highest Rated</option>
-                    <option value="PRICE">Lowest Price</option>
-                    <option value="NAME">Name A-Z</option>
-                  </select>
+                  <div>
+                    <p className="text-gray-600">
+                      <span className="font-semibold text-gray-900">{hotels?.total || 0}</span> hotels found
+                      {params.city && <span> in <strong>{params.city}</strong></span>}
+                      {params.search && <span> matching <strong>&quot;{params.search}&quot;</strong></span>}
+                    </p>
+                  </div>
+                  <Suspense>
+                    <HotelSort currentSort={params.sort || 'FEATURED'} />
+                  </Suspense>
                 </div>
                 
                 <Suspense fallback={<HotelGridSkeleton />}>
                   <HotelGrid hotels={hotels?.hotels || []} />
                 </Suspense>
+
+                {/* Pagination */}
+                {hotels && (
+                  <Suspense>
+                    <HotelPagination
+                      total={hotels.total}
+                      page={currentPage}
+                      limit={hotels.limit}
+                      hasMore={hotels.hasMore}
+                    />
+                  </Suspense>
+                )}
               </div>
             </div>
           </div>

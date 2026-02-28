@@ -191,3 +191,82 @@ export const UPDATE_BOOKING_STATUS = gql`
     }
   }
 `;
+
+// ============================================
+// Inventory / Pricing Calendar
+// ============================================
+
+export const GET_ADMIN_INVENTORY_CALENDAR = gql`
+  query GetAdminInventoryCalendar($roomTypeId: ID!, $startDate: DateTime!, $endDate: DateTime!) {
+    adminInventoryCalendar(roomTypeId: $roomTypeId, startDate: $startDate, endDate: $endDate) {
+      roomTypeId
+      roomTypeName
+      basePriceDaily
+      totalRooms
+      calendar {
+        date
+        available
+        price
+        basePrice
+        isClosed
+        minStayNights
+        hasCustomPrice
+        hasCustomAvailability
+      }
+    }
+  }
+`;
+
+export const BULK_UPDATE_INVENTORY = gql`
+  mutation BulkUpdateInventory($input: BulkInventoryUpdateInput!) {
+    bulkUpdateInventory(input: $input) {
+      success
+      message
+      daysUpdated
+    }
+  }
+`;
+
+export const UPDATE_DATE_INVENTORY = gql`
+  mutation UpdateDateInventory($input: SingleDateInventoryInput!) {
+    updateDateInventory(input: $input) {
+      id
+      date
+      availableCount
+      priceOverride
+      isClosed
+      minStayNights
+    }
+  }
+`;
+
+// ============================================
+// Analytics
+// ============================================
+
+export const GET_ADMIN_ANALYTICS = gql`
+  query GetAdminAnalytics($hotelId: ID!, $months: Int) {
+    adminAnalytics(hotelId: $hotelId, months: $months) {
+      monthlyData {
+        month
+        bookings
+        revenue
+      }
+      roomTypePopularity {
+        roomTypeName
+        bookings
+        revenue
+      }
+      bookingsBySource {
+        source
+        count
+      }
+      bookingsByStatus {
+        status
+        count
+      }
+      averageBookingValue
+      averageStayNights
+    }
+  }
+`;

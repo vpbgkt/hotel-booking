@@ -64,7 +64,8 @@ export default function AdminBookingsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const limit = 20;
 
-  const { data, loading, error, refetch } = useQuery(GET_ADMIN_BOOKINGS, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, loading, error, refetch } = useQuery<any>(GET_ADMIN_BOOKINGS, {
     variables: {
       filters: {
         hotelId,

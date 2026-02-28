@@ -37,7 +37,8 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const hotelId = user?.hotelId;
 
-  const { data, loading, error } = useQuery(GET_ADMIN_DASHBOARD_STATS, {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, loading, error } = useQuery<any>(GET_ADMIN_DASHBOARD_STATS, {
     variables: { hotelId },
     skip: !hotelId,
   });

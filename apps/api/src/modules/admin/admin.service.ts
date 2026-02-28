@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
-import { UpdateHotelInput, CreateRoomTypeInput, UpdateRoomTypeInput } from './dto/admin.input';
+import { UpdateHotelInput, CreateRoomTypeInput, UpdateRoomTypeInput, BulkInventoryUpdateInput, SingleDateInventoryInput } from './dto/admin.input';
+import { addDays, differenceInDays, format } from 'date-fns';
 
 @Injectable()
 export class AdminService {
@@ -251,5 +252,365 @@ export class AdminService {
         _count: { select: { bookings: true } },
       },
     });
+  }
+
+  // ============================================
+  // Inventory / Pricing Management
+  // ============================================
+
+  async bulkUpdateInventory(input: BulkInventoryUpdateInput) {
+    const { roomTypeId, startDate, endDate, priceOverride, availableCount, isClosed, minStayNights } = input;
+
+    // Verify room type exists
+    const roomType = await this.prisma.roomType.findUnique({ where: { id: roomTypeId } });
+    if (!roomType) {
+      throw new NotFoundException(`Room type ${roomTypeId} not found`);
+    }
+
+    const days = differenceInDays(new Date(endDate), new Date(startDate)) + 1;
+    if (days <= 0 || days > 365) {
+      throw new ForbiddenException('Date range must be 1-365 days');
+    }
+
+    const upsertOps = [];
+    for (let i = 0; i < days; i++) {
+      const date = addDays(new Date(startDate), i);
+      // Normalize to date-only (midnight UTC)
+      const dateOnly = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+
+      const updateData: Record<string, unknown> = {};
+      if (priceOverride !== undefined) updateData.priceOverride = priceOverride;
+      if (availableCount !== undefined) updateData.availableCount = availableCount;
+      if (isClosed !== undefined) updateData.isClosed = isClosed;
+      if (minStayNights !== undefined) updateData.minStayNights = minStayNights;
+
+      upsertOps.push(
+        this.prisma.roomInventory.upsert({
+          where: {
+            roomTypeId_date: { roomTypeId, date: dateOnly },
+          },
+          update: updateData,
+          create: {
+            roomTypeId,
+            date: dateOnly,
+            availableCount: availableCount ?? roomType.totalRooms,
+            priceOverride: priceOverride ?? null,
+            isClosed: isClosed ?? false,
+            minStayNights: minStayNights ?? 1,
+          },
+        }),
+      );
+    }
+
+    await this.prisma.$transaction(upsertOps);
+
+    // Invalidate cache
+    await this.redis.delPattern(`availability:${roomTypeId}:*`);
+    await this.redis.delPattern(`hotel:*`);
+
+    return {
+      success: true,
+      message: `Updated ${days} day(s) of inventory for room type`,
+      daysUpdated: days,
+    };
+  }
+
+  async updateSingleDateInventory(input: SingleDateInventoryInput) {
+    const { roomTypeId, date, priceOverride, availableCount, isClosed, minStayNights } = input;
+
+    const roomType = await this.prisma.roomType.findUnique({ where: { id: roomTypeId } });
+    if (!roomType) {
+      throw new NotFoundException(`Room type ${roomTypeId} not found`);
+    }
+
+    const dateOnly = new Date(Date.UTC(
+      new Date(date).getFullYear(),
+      new Date(date).getMonth(),
+      new Date(date).getDate(),
+    ));
+
+    const updateData: Record<string, unknown> = {};
+    if (priceOverride !== undefined) updateData.priceOverride = priceOverride;
+    if (availableCount !== undefined) updateData.availableCount = availableCount;
+    if (isClosed !== undefined) updateData.isClosed = isClosed;
+    if (minStayNights !== undefined) updateData.minStayNights = minStayNights;
+
+    const inventory = await this.prisma.roomInventory.upsert({
+      where: {
+        roomTypeId_date: { roomTypeId, date: dateOnly },
+      },
+      update: updateData,
+      create: {
+        roomTypeId,
+        date: dateOnly,
+        availableCount: availableCount ?? roomType.totalRooms,
+        priceOverride: priceOverride ?? null,
+        isClosed: isClosed ?? false,
+        minStayNights: minStayNights ?? 1,
+      },
+    });
+
+    // Invalidate cache
+    await this.redis.delPattern(`availability:${roomTypeId}:*`);
+
+    return inventory;
+  }
+
+  async getInventoryForDateRange(roomTypeId: string, startDate: Date, endDate: Date) {
+    const roomType = await this.prisma.roomType.findUnique({
+      where: { id: roomTypeId },
+      include: {
+        inventory: {
+          where: {
+            date: { gte: startDate, lte: endDate },
+          },
+          orderBy: { date: 'asc' },
+        },
+      },
+    });
+
+    if (!roomType) {
+      throw new NotFoundException(`Room type ${roomTypeId} not found`);
+    }
+
+    const days = differenceInDays(new Date(endDate), new Date(startDate)) + 1;
+    const calendar = [];
+
+    for (let i = 0; i < days; i++) {
+      const date = addDays(new Date(startDate), i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+
+      const inv = roomType.inventory.find(
+        (inv) => format(new Date(inv.date), 'yyyy-MM-dd') === dateStr,
+      );
+
+      calendar.push({
+        date: dateStr,
+        available: inv?.availableCount ?? roomType.totalRooms,
+        price: inv?.priceOverride ?? roomType.basePriceDaily,
+        basePrice: roomType.basePriceDaily,
+        isClosed: inv?.isClosed ?? false,
+        minStayNights: inv?.minStayNights ?? 1,
+        hasCustomPrice: inv?.priceOverride !== null && inv?.priceOverride !== undefined,
+        hasCustomAvailability: inv !== undefined,
+      });
+    }
+
+    return {
+      roomTypeId,
+      roomTypeName: roomType.name,
+      basePriceDaily: roomType.basePriceDaily,
+      totalRooms: roomType.totalRooms,
+      calendar,
+    };
+  }
+
+  // ============================================
+  // Analytics
+  // ============================================
+
+  async getAnalytics(hotelId: string, months: number = 6) {
+    const now = new Date();
+
+    // Compute monthly revenue and booking counts for the last N months
+    const monthlyData = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+
+      const [bookingCount, revenueResult] = await Promise.all([
+        this.prisma.booking.count({
+          where: {
+            hotelId,
+            createdAt: { gte: monthStart, lte: monthEnd },
+            status: { not: 'CANCELLED' },
+          },
+        }),
+        this.prisma.booking.aggregate({
+          where: {
+            hotelId,
+            createdAt: { gte: monthStart, lte: monthEnd },
+            paymentStatus: 'PAID',
+          },
+          _sum: { totalAmount: true },
+        }),
+      ]);
+
+      monthlyData.push({
+        month: format(monthStart, 'MMM yyyy'),
+        bookings: bookingCount,
+        revenue: revenueResult._sum.totalAmount || 0,
+      });
+    }
+
+    // Room type popularity (by booking count)
+    const roomTypeStats = await this.prisma.roomType.findMany({
+      where: { hotelId },
+      select: {
+        id: true,
+        name: true,
+        basePriceDaily: true,
+        _count: { select: { bookings: true } },
+      },
+      orderBy: { bookings: { _count: 'desc' } },
+    });
+
+    const roomTypePopularity = roomTypeStats.map((rt) => ({
+      roomTypeName: rt.name,
+      bookings: rt._count.bookings,
+      revenue: 0, // Will compute below
+    }));
+
+    // Revenue by room type
+    for (const rt of roomTypePopularity) {
+      const result = await this.prisma.booking.aggregate({
+        where: {
+          hotelId,
+          roomType: { name: rt.roomTypeName },
+          paymentStatus: 'PAID',
+        },
+        _sum: { totalAmount: true },
+      });
+      rt.revenue = result._sum.totalAmount || 0;
+    }
+
+    // Booking source distribution
+    const sourceGroups = await this.prisma.booking.groupBy({
+      by: ['source'],
+      where: { hotelId, status: { not: 'CANCELLED' } },
+      _count: true,
+    });
+
+    const bookingsBySource = sourceGroups.map((sg) => ({
+      source: sg.source,
+      count: sg._count,
+    }));
+
+    // Status distribution
+    const statusGroups = await this.prisma.booking.groupBy({
+      by: ['status'],
+      where: { hotelId },
+      _count: true,
+    });
+
+    const bookingsByStatus = statusGroups.map((sg) => ({
+      status: sg.status,
+      count: sg._count,
+    }));
+
+    // Average booking value
+    const avgBooking = await this.prisma.booking.aggregate({
+      where: { hotelId, paymentStatus: 'PAID' },
+      _avg: { totalAmount: true },
+    });
+
+    // Average stay duration
+    const bookingsWithDates = await this.prisma.booking.findMany({
+      where: { hotelId, bookingType: 'DAILY', status: { not: 'CANCELLED' } },
+      select: { checkInDate: true, checkOutDate: true },
+    });
+
+    let avgStayNights = 0;
+    if (bookingsWithDates.length > 0) {
+      const totalNights = bookingsWithDates.reduce((sum, b) => {
+        if (!b.checkOutDate || !b.checkInDate) return sum;
+        return sum + differenceInDays(new Date(b.checkOutDate), new Date(b.checkInDate));
+      }, 0);
+      avgStayNights = Math.round((totalNights / bookingsWithDates.length) * 10) / 10;
+    }
+
+    return {
+      monthlyData,
+      roomTypePopularity,
+      bookingsBySource,
+      bookingsByStatus,
+      averageBookingValue: avgBooking._avg.totalAmount || 0,
+      averageStayNights: avgStayNights,
+    };
+  }
+
+  // ============================================
+  // SEO Meta Management
+  // ============================================
+
+  async getSeoMetaForHotel(hotelId: string) {
+    return this.prisma.sEOMeta.findMany({
+      where: { hotelId },
+      orderBy: { pageSlug: 'asc' },
+    });
+  }
+
+  async upsertSeoMeta(input: {
+    hotelId: string;
+    pageSlug: string;
+    metaTitle?: string;
+    metaDescription?: string;
+    ogImageUrl?: string;
+    canonicalUrl?: string;
+    customJsonLd?: any;
+  }) {
+    const { hotelId, pageSlug, ...data } = input;
+
+    const result = await this.prisma.sEOMeta.upsert({
+      where: { hotelId_pageSlug: { hotelId, pageSlug } },
+      create: { hotelId, pageSlug, ...data },
+      update: data,
+    });
+
+    // Invalidate cache
+    await this.redis.del(`hotel:seo:${hotelId}:${pageSlug}`);
+
+    return result;
+  }
+
+  async deleteSeoMeta(id: string) {
+    const meta = await this.prisma.sEOMeta.findUnique({ where: { id } });
+    if (!meta) throw new NotFoundException('SEO meta not found');
+    
+    await this.prisma.sEOMeta.delete({ where: { id } });
+    await this.redis.del(`hotel:seo:${meta.hotelId}:${meta.pageSlug}`);
+    
+    return { success: true, message: 'SEO meta deleted' };
+  }
+
+  // ============================================
+  // Content / Theme Management
+  // ============================================
+
+  async getHotelContent(hotelId: string) {
+    const hotel = await this.prisma.hotel.findUnique({
+      where: { id: hotelId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        heroImageUrl: true,
+        logoUrl: true,
+        themeConfig: true,
+      },
+    });
+    if (!hotel) throw new NotFoundException('Hotel not found');
+    return hotel;
+  }
+
+  async updateHotelContent(hotelId: string, data: {
+    description?: string;
+    heroImageUrl?: string;
+    logoUrl?: string;
+    themeConfig?: any;
+  }) {
+    const hotel = await this.prisma.hotel.update({
+      where: { id: hotelId },
+      data,
+    });
+
+    // Invalidate caches
+    await this.redis.del(`hotel:${hotelId}`);
+    const hotelData = await this.prisma.hotel.findUnique({ where: { id: hotelId }, select: { slug: true } });
+    if (hotelData?.slug) {
+      await this.redis.del(`hotel:slug:${hotelData.slug}`);
+    }
+
+    return hotel;
   }
 }
