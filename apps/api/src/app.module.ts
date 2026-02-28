@@ -24,6 +24,7 @@ import { BookingModule } from './modules/booking/booking.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { PaymentModule } from './modules/payment/payment.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 // Health check
 import { HealthController } from './health.controller';
@@ -115,6 +116,7 @@ import { HealthController } from './health.controller';
     AuthModule,
     UserModule,
     PaymentModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [],

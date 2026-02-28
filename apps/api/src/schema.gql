@@ -2,6 +2,19 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
 # ------------------------------------------------------
 
+type AdminDashboardStats {
+  monthlyBookings: Int!
+  monthlyRevenue: Float!
+  occupancyRate: Int!
+  occupiedRooms: Int!
+  recentBookings: [Booking!]!
+  todayCheckIns: Int!
+  todayCheckOuts: Int!
+  totalBookings: Int!
+  totalRevenue: Float!
+  totalRooms: Int!
+}
+
 """Auth response with tokens"""
 type AuthResponse {
   accessToken: String
@@ -206,6 +219,22 @@ input CreateHourlyBookingInput {
   specialRequests: String
 }
 
+input CreateRoomTypeInput {
+  amenities: [String!]! = []
+  basePriceDaily: Float!
+  basePriceHourly: Float
+  description: String
+  extraGuestCharge: Float! = 0
+  hotelId: ID!
+  images: [String!]! = []
+  maxExtraGuests: Int! = 0
+  maxGuests: Int! = 2
+  name: String!
+  slug: String!
+  sortOrder: Int! = 0
+  totalRooms: Int! = 1
+}
+
 type DailyAvailabilityResult {
   checkIn: DateTime!
   checkOut: DateTime!
@@ -222,6 +251,11 @@ A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date
 scalar DateTime
 
 type DeactivateResponse {
+  message: String!
+  success: Boolean!
+}
+
+type DeleteResult {
   message: String!
   success: Boolean!
 }
@@ -383,8 +417,14 @@ type Mutation {
   """Create an hourly booking"""
   createHourlyBooking(input: CreateHourlyBookingInput!): BookingResult!
 
+  """Create a new room type"""
+  createRoomType(input: CreateRoomTypeInput!): RoomType!
+
   """Deactivate current user's account"""
   deactivateMyAccount: DeactivateResponse!
+
+  """Deactivate a room type (soft delete)"""
+  deleteRoomType(id: ID!): DeleteResult!
 
   """Start payment process for a booking"""
   initiatePayment(bookingId: ID!, method: String! = "card"): InitiatePaymentResult!
@@ -410,8 +450,14 @@ type Mutation {
   """Update booking status"""
   updateBookingStatus(input: UpdateBookingStatusInput!): Booking!
 
+  """Update hotel details (admin only)"""
+  updateHotel(input: UpdateHotelInput!): Hotel!
+
   """Update user profile"""
   updateProfile(input: UpdateProfileInput!): User!
+
+  """Update an existing room type"""
+  updateRoomType(input: UpdateRoomTypeInput!): RoomType!
 
   """Verify OTP and login/register"""
   verifyOTP(input: VerifyOTPInput!): AuthResponse!
@@ -475,6 +521,12 @@ type PopularCity {
 }
 
 type Query {
+  """Get dashboard stats for hotel admin"""
+  adminDashboardStats(hotelId: ID!): AdminDashboardStats!
+
+  """Get all room types for admin (including inactive)"""
+  adminRoomTypes(hotelId: ID!): [RoomType!]!
+
   """Get availability calendar for a room type"""
   availabilityCalendar(endDate: DateTime!, roomTypeId: ID!, startDate: DateTime!): AvailabilityCalendar!
 
@@ -651,12 +703,49 @@ input UpdateBookingStatusInput {
   status: BookingStatus!
 }
 
+input UpdateHotelInput {
+  address: String
+  checkInTime: String
+  checkOutTime: String
+  city: String
+  description: String
+  email: String
+  heroImageUrl: String
+  hotelId: ID!
+  latitude: Float
+  logoUrl: String
+  longitude: Float
+  name: String
+  phone: String
+  pincode: String
+  starRating: Int
+  state: String
+  themeConfig: JSON
+  whatsapp: String
+}
+
 """Update user profile input"""
 input UpdateProfileInput {
   avatarUrl: String
   email: String
   name: String
   phone: String
+}
+
+input UpdateRoomTypeInput {
+  amenities: [String!]
+  basePriceDaily: Float
+  basePriceHourly: Float
+  description: String
+  extraGuestCharge: Float
+  id: ID!
+  images: [String!]
+  isActive: Boolean
+  maxExtraGuests: Int
+  maxGuests: Int
+  name: String
+  sortOrder: Int
+  totalRooms: Int
 }
 
 """User entity"""

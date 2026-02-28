@@ -15,6 +15,7 @@ interface User {
   phone?: string;
   role: 'GUEST' | 'HOTEL_ADMIN' | 'PLATFORM_ADMIN';
   avatarUrl?: string;
+  hotelId?: string;
 }
 
 interface AuthState {
@@ -68,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({
-            query: `query Me { me { id email name phone role avatarUrl } }`,
+            query: `query Me { me { id email name phone role avatarUrl hotelId } }`,
           }),
         });
 
@@ -111,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 message
                 accessToken
                 refreshToken
-                user { id email name phone role avatarUrl }
+                user { id email name phone role avatarUrl hotelId }
               }
             }
           `,
@@ -162,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 message
                 accessToken
                 refreshToken
-                user { id email name phone role avatarUrl }
+                user { id email name phone role avatarUrl hotelId }
               }
             }
           `,
