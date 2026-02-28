@@ -156,6 +156,11 @@ export class HotelService {
               where: { isPublished: true },
               take: 10,
               orderBy: { createdAt: 'desc' },
+              include: {
+                guest: {
+                  select: { name: true, avatarUrl: true },
+                },
+              },
             },
             media: {
               orderBy: { sortOrder: 'asc' },

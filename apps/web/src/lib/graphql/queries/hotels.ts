@@ -87,6 +87,17 @@ export const GET_HOTEL_BY_SLUG = gql`
         images
         isActive
       }
+      reviews {
+        id
+        rating
+        title
+        comment
+        createdAt
+        guest {
+          name
+          avatarUrl
+        }
+      }
     }
   }
   ${HOTEL_DETAIL_FRAGMENT}

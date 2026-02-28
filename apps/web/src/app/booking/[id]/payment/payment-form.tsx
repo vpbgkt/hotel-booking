@@ -2,12 +2,14 @@
 
 /**
  * Payment Form Component
- * Handles payment method selection and processing
+ * Handles payment method selection and processing via Demo/Real gateway
  */
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
+import { INITIATE_PAYMENT, CONFIRM_PAYMENT } from '@/lib/graphql/mutations/payments';
 import { 
   CreditCard, 
   Smartphone, 
@@ -37,6 +39,10 @@ export function PaymentForm({ bookingId, amount }: PaymentFormProps) {
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('card');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Apollo mutations
+  const [initiatePayment] = useMutation(INITIATE_PAYMENT);
+  const [confirmPayment] = useMutation(CONFIRM_PAYMENT);
   
   // Card details state
   const [cardNumber, setCardNumber] = useState('');
@@ -71,18 +77,46 @@ export function PaymentForm({ bookingId, amount }: PaymentFormProps) {
     setError(null);
     
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // In production, this would:
-      // 1. Call Razorpay/Stripe to create payment intent
-      // 2. Process payment
-      // 3. Confirm booking via API
-      
-      // Redirect to confirmation page
+      // Step 1: Initiate payment via API
+      const { data: initData } = await initiatePayment({
+        variables: {
+          bookingId,
+          method: selectedMethod,
+        },
+      });
+
+      if (!initData?.initiatePayment?.paymentId) {
+        throw new Error('Failed to initiate payment');
+      }
+
+      const { paymentId, gateway } = initData.initiatePayment;
+
+      // Step 2: For demo gateway, auto-confirm immediately
+      // For real gateways (Razorpay/Stripe), this is where you'd
+      // open the gateway checkout modal and get payment confirmation
+      if (gateway === 'DEMO') {
+        // Small delay for UX - shows "processing" state
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
+      // Step 3: Confirm payment
+      const { data: confirmData } = await confirmPayment({
+        variables: {
+          paymentId,
+          // For real gateways, pass gatewayPaymentId and signature here
+          gatewayPaymentId: null,
+          gatewaySignature: null,
+        },
+      });
+
+      if (!confirmData?.confirmPayment?.success) {
+        throw new Error(confirmData?.confirmPayment?.message || 'Payment confirmation failed');
+      }
+
+      // Step 4: Redirect to confirmation page
       router.push(`/booking/${bookingId}/confirmation`);
-    } catch (err) {
-      setError('Payment failed. Please try again.');
+    } catch (err: any) {
+      setError(err?.message || 'Payment failed. Please try again.');
     } finally {
       setLoading(false);
     }

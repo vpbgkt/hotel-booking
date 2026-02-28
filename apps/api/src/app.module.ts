@@ -23,6 +23,7 @@ import { RoomModule } from './modules/room/room.module';
 import { BookingModule } from './modules/booking/booking.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
+import { PaymentModule } from './modules/payment/payment.module';
 
 // Health check
 import { HealthController } from './health.controller';
@@ -113,6 +114,7 @@ import { HealthController } from './health.controller';
     BookingModule,
     AuthModule,
     UserModule,
+    PaymentModule,
   ],
   controllers: [HealthController],
   providers: [],

@@ -507,6 +507,7 @@ enum PaymentGateway {
   RAZORPAY
   STRIPE
   CASH
+  DEMO
 }
 
 enum TransactionStatus {

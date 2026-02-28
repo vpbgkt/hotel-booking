@@ -63,11 +63,29 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * ISO 8601 date string pattern for JSON reviver
+   */
+  private static readonly ISO_DATE_RE =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
+
+  /**
+   * JSON reviver that converts ISO date strings back to Date objects.
+   * This is needed because Redis stores JSON as plain text, and
+   * Date objects become strings during serialization.
+   */
+  private static dateReviver(_key: string, value: unknown): unknown {
+    if (typeof value === 'string' && RedisService.ISO_DATE_RE.test(value)) {
+      return new Date(value);
+    }
+    return value;
+  }
+
+  /**
    * Get a JSON value from cache
    */
   async getJson<T>(key: string): Promise<T | null> {
     const value = await this.client.get(key);
-    return value ? JSON.parse(value) : null;
+    return value ? JSON.parse(value, RedisService.dateReviver) : null;
   }
 
   /**

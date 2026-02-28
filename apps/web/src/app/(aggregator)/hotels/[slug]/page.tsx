@@ -10,6 +10,7 @@ import Image from 'next/image';
 import { getClient } from '@/lib/graphql/client';
 import { GET_HOTEL_BY_SLUG } from '@/lib/graphql/queries/hotels';
 import { RoomCard } from '@/components/rooms/room-card';
+import { ReviewSection } from '@/components/reviews/review-section';
 import { BookingWidget } from '@/components/booking/booking-widget';
 import { StarRating } from '@/components/ui/star-rating';
 import { Badge } from '@/components/ui/badge';
@@ -70,6 +71,17 @@ interface HotelData {
     amenities: string[];
     images: string[];
     isActive: boolean;
+  }[];
+  reviews?: {
+    id: string;
+    rating: number;
+    title?: string;
+    comment?: string;
+    createdAt: string;
+    guest: {
+      name: string;
+      avatarUrl?: string;
+    };
   }[];
 }
 
@@ -251,11 +263,14 @@ export default async function HotelPage({ params }: HotelPageProps) {
                   </div>
                 </div>
                 
-                {/* Reviews - Coming soon */}
-                {/* TODO: Fix DateTime serialization in GraphQL API before enabling reviews */}
-                <div className="p-6 bg-gray-50 rounded-xl text-center">
-                  <h3 className="font-semibold text-gray-700 mb-2">Guest Reviews</h3>
-                  <p className="text-sm text-gray-500">Reviews coming soon...</p>
+                {/* Reviews */}
+                <div id="reviews">
+                  <ReviewSection
+                    hotelId={hotel.id}
+                    averageRating={hotel.averageRating}
+                    reviewCount={hotel.reviewCount}
+                    reviews={hotel.reviews || []}
+                  />
                 </div>
               </div>
               
