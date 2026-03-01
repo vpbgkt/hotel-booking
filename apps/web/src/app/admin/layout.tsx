@@ -27,6 +27,7 @@ import {
   Search,
   MessageCircle,
   Brain,
+  Palette,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -80,6 +81,11 @@ const adminLinks = [
     label: 'Payments',
     href: '/admin/payments',
     icon: CreditCard,
+  },
+  {
+    label: 'Branding',
+    href: '/admin/branding',
+    icon: Palette,
   },
   {
     label: 'Hotel Settings',

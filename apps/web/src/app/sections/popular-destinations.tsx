@@ -89,7 +89,7 @@ export function PopularDestinations() {
               `}
             >
               <Link
-                href={`/hotels?city=${destination.name}`}
+                href={`/hotels/city/${destination.name.toLowerCase().replace(/\s+/g, '-')}`}
                 className="group relative block overflow-hidden rounded-2xl aspect-[4/3] md:aspect-auto md:h-full min-h-[200px]"
               >
                 {/* Background Image */}

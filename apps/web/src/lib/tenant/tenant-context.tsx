@@ -101,24 +101,76 @@ export function useTenant() {
 }
 
 /**
- * Apply CSS custom properties based on hotel theme config
+ * Apply CSS custom properties based on hotel theme config.
+ * Generates a full color palette from a single primary color.
+ * CSS variables are consumed by tenant-specific Tailwind utilities.
  */
+function hexToHSL(hex: string): { h: number; s: number; l: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return null;
+  let r = parseInt(result[1], 16) / 255;
+  let g = parseInt(result[2], 16) / 255;
+  let b = parseInt(result[3], 16) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return { h: Math.round(h * 360), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+function generateShades(hex: string): Record<string, string> {
+  const hsl = hexToHSL(hex);
+  if (!hsl) return {};
+  const { h, s } = hsl;
+  return {
+    '50': `hsl(${h}, ${Math.min(s + 10, 100)}%, 97%)`,
+    '100': `hsl(${h}, ${Math.min(s + 5, 100)}%, 93%)`,
+    '200': `hsl(${h}, ${s}%, 85%)`,
+    '300': `hsl(${h}, ${s}%, 75%)`,
+    '400': `hsl(${h}, ${s}%, 60%)`,
+    '500': `hsl(${h}, ${s}%, 48%)`,
+    '600': hex,
+    '700': `hsl(${h}, ${Math.min(s + 5, 100)}%, 38%)`,
+    '800': `hsl(${h}, ${Math.min(s + 10, 100)}%, 30%)`,
+    '900': `hsl(${h}, ${Math.min(s + 15, 100)}%, 22%)`,
+    '950': `hsl(${h}, ${Math.min(s + 20, 100)}%, 14%)`,
+  };
+}
+
 function applyTheme(theme: ThemeConfig) {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
   
   if (theme.primaryColor) {
+    // Generate full palette from primary color
+    const shades = generateShades(theme.primaryColor);
+    Object.entries(shades).forEach(([shade, value]) => {
+      root.style.setProperty(`--tenant-primary-${shade}`, value);
+    });
     root.style.setProperty('--tenant-primary', theme.primaryColor);
-    // Generate lighter/darker shades
-    root.style.setProperty('--tenant-primary-light', `${theme.primaryColor}20`);
-    root.style.setProperty('--tenant-primary-dark', theme.secondaryColor || theme.primaryColor);
+    root.style.setProperty('--tenant-primary-light', shades['100'] || `${theme.primaryColor}20`);
+    root.style.setProperty('--tenant-primary-dark', theme.secondaryColor || shades['800'] || theme.primaryColor);
   }
   if (theme.accentColor) {
+    const accentShades = generateShades(theme.accentColor);
     root.style.setProperty('--tenant-accent', theme.accentColor);
+    Object.entries(accentShades).forEach(([shade, value]) => {
+      root.style.setProperty(`--tenant-accent-${shade}`, value);
+    });
   }
   if (theme.fontFamily) {
     root.style.setProperty('--tenant-font', theme.fontFamily);
   }
+  // Apply body background for themed pages
+  root.style.setProperty('--tenant-bg', theme.primaryColor ? 
+    generateShades(theme.primaryColor)['50'] || '#f9fafb' : '#f9fafb');
 }
 
 // In dev, we default to "radhika-resort" slug

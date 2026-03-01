@@ -7,12 +7,15 @@
 
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Enable logging in development
     logger: process.env.NODE_ENV === 'production' 
       ? ['error', 'warn'] 
@@ -29,6 +32,13 @@ async function bootstrap() {
 
   // Response compression
   app.use(compression());
+
+  // Static file serving for uploads
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!existsSync(uploadsDir)) {
+    mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads/' });
 
   // Global prefix for REST endpoints (GraphQL is at /graphql)
   app.setGlobalPrefix('api', {

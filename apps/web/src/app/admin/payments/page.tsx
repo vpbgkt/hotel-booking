@@ -32,7 +32,6 @@ export default function AdminPaymentsPage() {
   const [saved, setSaved] = useState(false);
   const [gatewayConfig, setGatewayConfig] = useState({
     razorpayAccountId: '',
-    stripeAccountId: '',
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,7 +66,6 @@ export default function AdminPaymentsPage() {
     if (hotelData?.hotel) {
       setGatewayConfig({
         razorpayAccountId: hotelData.hotel.razorpayAccountId || '',
-        stripeAccountId: hotelData.hotel.stripeAccountId || '',
       });
     }
   }, [hotelData]);
@@ -78,7 +76,6 @@ export default function AdminPaymentsPage() {
         input: {
           hotelId,
           razorpayAccountId: gatewayConfig.razorpayAccountId || undefined,
-          stripeAccountId: gatewayConfig.stripeAccountId || undefined,
         },
       },
     });
@@ -90,8 +87,7 @@ export default function AdminPaymentsPage() {
   const pendingBookings = bookings.filter((b: { paymentStatus: string }) => b.paymentStatus === 'PENDING');
 
   const hasRazorpay = !!gatewayConfig.razorpayAccountId;
-  const hasStripe = !!gatewayConfig.stripeAccountId;
-  const activeGateway = hasRazorpay ? 'Razorpay' : hasStripe ? 'Stripe' : 'Demo';
+  const activeGateway = hasRazorpay ? 'Razorpay' : 'Demo';
 
   if (!hotelId) {
     return (
@@ -184,14 +180,14 @@ export default function AdminPaymentsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Demo Mode Banner */}
-          {!hasRazorpay && !hasStripe && (
+          {!hasRazorpay && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <ShieldCheck className="w-5 h-5 text-yellow-600 mt-0.5" />
                 <div>
                   <h4 className="font-medium text-yellow-800">Demo Mode Active</h4>
                   <p className="text-sm text-yellow-700 mt-1">
-                    Payments are simulated. Configure a payment gateway below to accept real payments.
+                    Payments are simulated. Configure Razorpay below to accept real payments.
                   </p>
                 </div>
               </div>
@@ -229,42 +225,6 @@ export default function AdminPaymentsPage() {
                 Find this in your{' '}
                 <a href="https://dashboard.razorpay.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline inline-flex items-center gap-1">
                   Razorpay Dashboard <ExternalLink className="w-3 h-3" />
-                </a>
-              </p>
-            </div>
-          </div>
-
-          {/* Stripe */}
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded bg-purple-600 flex items-center justify-center text-white font-bold text-xs">
-                  S
-                </div>
-                <div>
-                  <h4 className="font-medium text-sm">Stripe</h4>
-                  <p className="text-xs text-gray-500">Global payment gateway</p>
-                </div>
-              </div>
-              {hasStripe && (
-                <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                  Connected
-                </span>
-              )}
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Account ID</label>
-              <input
-                type="text"
-                value={gatewayConfig.stripeAccountId}
-                onChange={(e) => setGatewayConfig(prev => ({ ...prev, stripeAccountId: e.target.value }))}
-                placeholder="acct_xxxxxxxxxx"
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Find this in your{' '}
-                <a href="https://dashboard.stripe.com" target="_blank" rel="noopener noreferrer" className="text-brand-600 hover:underline inline-flex items-center gap-1">
-                  Stripe Dashboard <ExternalLink className="w-3 h-3" />
                 </a>
               </p>
             </div>

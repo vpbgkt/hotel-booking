@@ -1,16 +1,19 @@
 /**
  * Payment Service - BlueStay API
  * 
- * Gateway-agnostic payment service with demo mode.
- * Architecture: Uses a strategy pattern so real gateways 
- * (Razorpay, Stripe) can be swapped in without changing business logic.
+ * Gateway-agnostic payment service with Razorpay integration.
+ * Architecture: Uses a strategy pattern — DemoGateway for dev, 
+ * RazorpayGateway for production (Indian payments only).
  */
 
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHmac } from 'crypto';
+import Razorpay from 'razorpay';
 
 export interface PaymentGatewayInterface {
+  readonly name: string;
+  
   createOrder(amount: number, currency: string, metadata?: Record<string, any>): Promise<{
     orderId: string;
     amount: number;
@@ -37,6 +40,8 @@ export interface PaymentGatewayInterface {
  * All payments auto-approve after a brief delay.
  */
 class DemoGateway implements PaymentGatewayInterface {
+  readonly name = 'DEMO';
+
   async createOrder(amount: number, currency: string, metadata?: Record<string, any>) {
     const orderId = `demo_order_${randomUUID().slice(0, 12)}`;
     return {
@@ -53,7 +58,6 @@ class DemoGateway implements PaymentGatewayInterface {
   }
 
   async verifyPayment(paymentId: string, orderId: string) {
-    // Demo gateway always verifies successfully
     return {
       verified: true,
       gatewayPaymentId: paymentId || `demo_pay_${randomUUID().slice(0, 12)}`,
@@ -70,17 +74,107 @@ class DemoGateway implements PaymentGatewayInterface {
   }
 }
 
+/**
+ * Razorpay Payment Gateway
+ * Real payment processing for Indian payments.
+ * Supports UPI, Cards, Net Banking, Wallets via Razorpay Checkout.
+ * Amounts are in paise (1 INR = 100 paise).
+ */
+class RazorpayGateway implements PaymentGatewayInterface {
+  readonly name = 'RAZORPAY';
+  private razorpay: InstanceType<typeof Razorpay>;
+  private keyId: string;
+  private keySecret: string;
+
+  constructor() {
+    this.keyId = process.env.RAZORPAY_KEY_ID || '';
+    this.keySecret = process.env.RAZORPAY_KEY_SECRET || '';
+    this.razorpay = new Razorpay({
+      key_id: this.keyId,
+      key_secret: this.keySecret,
+    });
+  }
+
+  async createOrder(amount: number, currency: string, metadata?: Record<string, any>) {
+    const amountInPaise = Math.round(amount * 100);
+    const receipt = `rcpt_${randomUUID().slice(0, 12)}`;
+
+    const order = await this.razorpay.orders.create({
+      amount: amountInPaise,
+      currency: currency || 'INR',
+      receipt,
+      notes: metadata ? {
+        bookingId: metadata.bookingId || '',
+        bookingNumber: metadata.bookingNumber || '',
+        hotelName: metadata.hotelName || '',
+      } : undefined,
+    });
+
+    return {
+      orderId: order.id,
+      amount,
+      currency: order.currency,
+      gatewayData: {
+        gateway: 'RAZORPAY',
+        razorpayKeyId: this.keyId,
+        razorpayOrderId: order.id,
+        amount: amountInPaise,
+        currency: order.currency,
+        name: metadata?.hotelName || 'BlueStay',
+        description: `Booking ${metadata?.bookingNumber || ''}`,
+        prefill: metadata?.prefill || {},
+      },
+    };
+  }
+
+  async verifyPayment(paymentId: string, orderId: string, signature?: string) {
+    if (!signature) {
+      return { verified: false, gatewayPaymentId: paymentId, status: 'FAILED' };
+    }
+
+    // Razorpay signature verification: HMAC SHA256 of "orderId|paymentId"
+    const expectedSignature = createHmac('sha256', this.keySecret)
+      .update(`${orderId}|${paymentId}`)
+      .digest('hex');
+
+    const verified = expectedSignature === signature;
+
+    return {
+      verified,
+      gatewayPaymentId: paymentId,
+      status: verified ? 'CAPTURED' : 'FAILED',
+    };
+  }
+
+  async processRefund(paymentId: string, amount: number) {
+    const amountInPaise = Math.round(amount * 100);
+
+    const refund = await this.razorpay.payments.refund(paymentId, {
+      amount: amountInPaise,
+    });
+
+    return {
+      refundId: refund.id,
+      amount,
+      status: refund.status === 'processed' ? 'REFUNDED' : 'PENDING',
+    };
+  }
+}
+
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
   private gateway: PaymentGatewayInterface;
 
   constructor(private readonly prisma: PrismaService) {
-    // Default to demo gateway. In production, select based on config:
-    // if (process.env.PAYMENT_GATEWAY === 'razorpay') this.gateway = new RazorpayGateway();
-    // if (process.env.PAYMENT_GATEWAY === 'stripe') this.gateway = new StripeGateway();
-    this.gateway = new DemoGateway();
-    this.logger.log('Payment service initialized with DEMO gateway');
+    // Auto-select gateway based on env config
+    if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+      this.gateway = new RazorpayGateway();
+      this.logger.log('Payment service initialized with RAZORPAY gateway');
+    } else {
+      this.gateway = new DemoGateway();
+      this.logger.log('Payment service initialized with DEMO gateway (set RAZORPAY_KEY_ID & RAZORPAY_KEY_SECRET for real payments)');
+    }
   }
 
   /**
@@ -119,7 +213,7 @@ export class PaymentService {
     const payment = await this.prisma.payment.create({
       data: {
         bookingId: booking.id,
-        gateway: 'DEMO',
+        gateway: this.gateway.name as any,
         gatewayOrderId: order.orderId,
         amount: booking.totalAmount,
         currency: 'INR',
@@ -128,14 +222,14 @@ export class PaymentService {
       },
     });
 
-    this.logger.log(`Payment initiated for booking ${booking.bookingNumber}: ${payment.id}`);
+    this.logger.log(`Payment initiated for booking ${booking.bookingNumber}: ${payment.id} via ${this.gateway.name}`);
 
     return {
       paymentId: payment.id,
       orderId: order.orderId,
       amount: booking.totalAmount,
       currency: 'INR',
-      gateway: 'DEMO',
+      gateway: this.gateway.name,
       bookingNumber: booking.bookingNumber,
       gatewayData: order.gatewayData,
     };

@@ -2,10 +2,10 @@
 
 /**
  * Payment Form Component
- * Handles payment method selection and processing via Demo/Real gateway
+ * Handles payment method selection and processing via Demo/Razorpay gateway
  */
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@apollo/client';
 import { Button } from '@/components/ui/button';
@@ -20,9 +20,44 @@ import {
   Loader2
 } from 'lucide-react';
 
+// Declare Razorpay global type
+declare global {
+  interface Window {
+    Razorpay: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
+
+interface RazorpayOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill?: { name?: string; email?: string; contact?: string };
+  theme?: { color?: string };
+  method?: { upi?: boolean; card?: boolean; netbanking?: boolean; wallet?: boolean };
+  handler: (response: RazorpayResponse) => void;
+  modal?: { ondismiss?: () => void };
+}
+
+interface RazorpayResponse {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+}
+
+interface RazorpayInstance {
+  open: () => void;
+  on: (event: string, handler: (response: any) => void) => void;
+}
+
 interface PaymentFormProps {
   bookingId: string;
   amount: number;
+  guestName?: string;
+  guestEmail?: string;
+  guestPhone?: string;
 }
 
 type PaymentMethod = 'card' | 'upi' | 'netbanking' | 'wallet';
@@ -34,11 +69,12 @@ const paymentMethods = [
   { id: 'wallet', label: 'Wallet', icon: Wallet, description: 'Paytm, Amazon Pay' },
 ] as const;
 
-export function PaymentForm({ bookingId, amount }: PaymentFormProps) {
+export function PaymentForm({ bookingId, amount, guestName, guestEmail, guestPhone }: PaymentFormProps) {
   const router = useRouter();
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('card');
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('upi');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   
   // Apollo mutations
   const [initiatePayment] = useMutation(INITIATE_PAYMENT);
@@ -52,6 +88,53 @@ export function PaymentForm({ bookingId, amount }: PaymentFormProps) {
   
   // UPI state
   const [upiId, setUpiId] = useState('');
+
+  // Load Razorpay Checkout script
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.Razorpay) {
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.async = true;
+      script.onload = () => setRazorpayLoaded(true);
+      script.onerror = () => console.warn('Failed to load Razorpay script — will use demo mode');
+      document.body.appendChild(script);
+    } else if (typeof window !== 'undefined' && window.Razorpay) {
+      setRazorpayLoaded(true);
+    }
+  }, []);
+
+  const openRazorpayCheckout = useCallback((gatewayData: any, paymentId: string) => {
+    return new Promise<RazorpayResponse>((resolve, reject) => {
+      const options: RazorpayOptions = {
+        key: gatewayData.razorpayKeyId,
+        amount: gatewayData.amount,
+        currency: gatewayData.currency || 'INR',
+        name: gatewayData.name || 'BlueStay',
+        description: gatewayData.description || 'Hotel Booking Payment',
+        order_id: gatewayData.razorpayOrderId,
+        prefill: {
+          name: guestName || '',
+          email: guestEmail || '',
+          contact: guestPhone || '',
+        },
+        theme: { color: '#2563eb' },
+        handler: (response: RazorpayResponse) => {
+          resolve(response);
+        },
+        modal: {
+          ondismiss: () => {
+            reject(new Error('Payment cancelled by user'));
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (response: any) => {
+        reject(new Error(response.error?.description || 'Payment failed'));
+      });
+      rzp.open();
+    });
+  }, [guestName, guestEmail, guestPhone]);
 
   const formatCardNumber = (value: string) => {
     const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
@@ -89,23 +172,28 @@ export function PaymentForm({ bookingId, amount }: PaymentFormProps) {
         throw new Error('Failed to initiate payment');
       }
 
-      const { paymentId, gateway } = initData.initiatePayment;
+      const { paymentId, gateway, gatewayData: gatewayDataStr } = initData.initiatePayment;
+      const gatewayData = gatewayDataStr ? JSON.parse(gatewayDataStr) : {};
 
-      // Step 2: For demo gateway, auto-confirm immediately
-      // For real gateways (Razorpay/Stripe), this is where you'd
-      // open the gateway checkout modal and get payment confirmation
-      if (gateway === 'DEMO') {
-        // Small delay for UX - shows "processing" state
+      let gatewayPaymentId: string | null = null;
+      let gatewaySignature: string | null = null;
+
+      if (gateway === 'RAZORPAY' && razorpayLoaded && window.Razorpay) {
+        // Open Razorpay Checkout modal
+        const response = await openRazorpayCheckout(gatewayData, paymentId);
+        gatewayPaymentId = response.razorpay_payment_id;
+        gatewaySignature = response.razorpay_signature;
+      } else if (gateway === 'DEMO') {
+        // Demo mode: small delay for UX
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
 
-      // Step 3: Confirm payment
+      // Step 2: Confirm payment with backend
       const { data: confirmData } = await confirmPayment({
         variables: {
           paymentId,
-          // For real gateways, pass gatewayPaymentId and signature here
-          gatewayPaymentId: null,
-          gatewaySignature: null,
+          gatewayPaymentId,
+          gatewaySignature,
         },
       });
 
@@ -113,10 +201,14 @@ export function PaymentForm({ bookingId, amount }: PaymentFormProps) {
         throw new Error(confirmData?.confirmPayment?.message || 'Payment confirmation failed');
       }
 
-      // Step 4: Redirect to confirmation page
+      // Step 3: Redirect to confirmation page
       router.push(`/booking/${bookingId}/confirmation`);
     } catch (err: any) {
-      setError(err?.message || 'Payment failed. Please try again.');
+      if (err?.message === 'Payment cancelled by user') {
+        setError('Payment was cancelled. You can try again.');
+      } else {
+        setError(err?.message || 'Payment failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
