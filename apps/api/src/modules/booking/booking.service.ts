@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { NotificationService } from '../notification/notification.service';
+import { QueueService } from '../queue/queue.service';
 import { 
   CreateDailyBookingInput, 
   CreateHourlyBookingInput,
@@ -29,6 +30,7 @@ export class BookingService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly notifications: NotificationService,
+    private readonly queue: QueueService,
   ) {}
 
   // Lock TTL: 30 seconds to complete booking transaction
@@ -256,6 +258,9 @@ export class BookingService {
 
       this.logger.log(`Created booking ${booking.bookingNumber} for hotel ${hotelId}`);
 
+      // Schedule auto-cancel for unpaid bookings (30 min timeout)
+      this.queue.scheduleAutoCancel(booking.id, 30).catch(() => {});
+
       return {
         success: true,
         booking,
@@ -461,6 +466,9 @@ export class BookingService {
       await this.redis.releaseLock(lockKey);
 
       this.logger.log(`Created hourly booking ${booking.bookingNumber} for hotel ${hotelId}`);
+
+      // Schedule auto-cancel for unpaid bookings (30 min timeout)
+      this.queue.scheduleAutoCancel(booking.id, 30).catch(() => {});
 
       return {
         success: true,
@@ -727,8 +735,16 @@ export class BookingService {
     // Send notifications based on status change (fire and forget)
     if (status === BookingStatus.CONFIRMED) {
       this.notifications.notifyBookingConfirmed(bookingId).catch(() => {});
+      // Schedule check-in reminder for 1 day before
+      if (updatedBooking.checkInDate) {
+        this.queue.scheduleBookingReminder(bookingId, new Date(updatedBooking.checkInDate)).catch(() => {});
+      }
     } else if (status === BookingStatus.CHECKED_OUT) {
       this.notifications.notifyCheckoutReviewPrompt(bookingId).catch(() => {});
+      // Schedule review request email for 24h post-checkout
+      if (updatedBooking.checkOutDate) {
+        this.queue.scheduleReviewRequest(bookingId, new Date(updatedBooking.checkOutDate)).catch(() => {});
+      }
     }
 
     return updatedBooking;

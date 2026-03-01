@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useTenant } from '@/lib/tenant/tenant-context';
 import { CHECK_DAILY_AVAILABILITY } from '@/lib/graphql/queries/rooms';
+import { AvailabilityCalendar } from '@/components/booking/availability-calendar';
 
 const AMENITY_ICONS: Record<string, React.ReactNode> = {
   wifi: <Wifi className="w-4 h-4" />,
@@ -74,6 +75,8 @@ export default function TenantRoomsPage() {
   const [bookingMode, setBookingMode] = useState<'DAILY' | 'HOURLY'>('DAILY');
   const [expandedRoom, setExpandedRoom] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'price' | 'guests' | 'name'>('price');
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarRoomId, setCalendarRoomId] = useState<string | null>(null);
 
   const nights = Math.max(1, differenceInDays(new Date(checkOut), new Date(checkIn)));
 
@@ -228,6 +231,57 @@ export default function TenantRoomsPage() {
 
       {/* Room Cards */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Availability Calendar Toggle */}
+        {activeRooms.length > 0 && bookingMode === 'DAILY' && (
+          <div className="mb-6">
+            <button
+              onClick={() => {
+                setShowCalendar(!showCalendar);
+                if (!calendarRoomId && activeRooms[0]) {
+                  setCalendarRoomId(activeRooms[0].id);
+                }
+              }}
+              className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700 transition-colors"
+            >
+              <Calendar className="w-4 h-4" />
+              {showCalendar ? 'Hide availability calendar' : 'View availability calendar'}
+            </button>
+
+            {showCalendar && calendarRoomId && (
+              <div className="mt-4 max-w-md">
+                {/* Room selector for calendar */}
+                {activeRooms.length > 1 && (
+                  <div className="mb-3">
+                    <select
+                      value={calendarRoomId}
+                      onChange={(e) => setCalendarRoomId(e.target.value)}
+                      className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500 w-full"
+                    >
+                      {activeRooms.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          {room.name} — ₹{room.basePriceDaily.toLocaleString('en-IN')}/night
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <AvailabilityCalendar
+                  roomTypeId={calendarRoomId}
+                  basePrice={activeRooms.find(r => r.id === calendarRoomId)?.basePriceDaily || 0}
+                  totalRooms={activeRooms.find(r => r.id === calendarRoomId)?.totalRooms || 1}
+                  selectedCheckIn={checkIn}
+                  selectedCheckOut={checkOut}
+                  onDateRangeSelect={(ci, co) => {
+                    setCheckIn(ci);
+                    setCheckOut(co);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="space-y-6">
           {activeRooms.map((room) => {
             const avail = availabilityMap[room.id];

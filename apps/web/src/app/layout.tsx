@@ -4,6 +4,7 @@ import "@/styles/globals.css";
 import { Toaster } from "sonner";
 import { ApolloWrapper } from "@/lib/graphql";
 import { AuthProvider } from "@/lib/auth/auth-context";
+import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
 
 /**
  * Inter font configuration
@@ -144,6 +145,9 @@ export default function RootLayout({
           richColors
           closeButton
         />
+
+        {/* PWA service worker registration */}
+        <ServiceWorkerRegistration />
       </body>
     </html>
   );

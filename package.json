@@ -18,9 +18,12 @@
     "db:push": "turbo run db:push --filter=api",
     "db:seed": "turbo run db:seed --filter=api",
     "db:studio": "turbo run db:studio --filter=api",
-    "clean": "turbo run clean && rm -rf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "prettier": "^3.5.0",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0"

@@ -4,6 +4,7 @@ import { BookingService } from '../booking.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { NotificationService } from '../../notification/notification.service';
+import { QueueService } from '../../queue/queue.service';
 import { CreateDailyBookingInput } from '../dto/create-booking.input';
 import { addDays } from 'date-fns';
 
@@ -12,6 +13,7 @@ describe('BookingService', () => {
   let mockPrisma: Record<string, any>;
   let mockRedis: Record<string, any>;
   let mockNotification: Record<string, any>;
+  let mockQueue: Record<string, any>;
 
   beforeEach(async () => {
     mockPrisma = {
@@ -34,12 +36,20 @@ describe('BookingService', () => {
       notifyBookingCancelled: jest.fn(),
     };
 
+    mockQueue = {
+      scheduleAutoCancel: jest.fn().mockResolvedValue(undefined),
+      scheduleBookingReminder: jest.fn().mockResolvedValue(undefined),
+      scheduleReviewRequest: jest.fn().mockResolvedValue(undefined),
+      sendEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BookingService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: RedisService, useValue: mockRedis },
         { provide: NotificationService, useValue: mockNotification },
+        { provide: QueueService, useValue: mockQueue },
       ],
     }).compile();
 

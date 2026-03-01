@@ -16,6 +16,8 @@ import { existsSync, mkdirSync } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    // Enable raw body for webhook signature verification (Razorpay)
+    rawBody: true,
     // Enable logging in development
     logger: process.env.NODE_ENV === 'production' 
       ? ['error', 'warn'] 

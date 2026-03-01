@@ -28,6 +28,7 @@ import {
   MessageCircle,
   Brain,
   Palette,
+  ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -71,6 +72,11 @@ const adminLinks = [
     label: 'Content',
     href: '/admin/content',
     icon: FileText,
+  },
+  {
+    label: 'Gallery',
+    href: '/admin/gallery',
+    icon: ImageIcon,
   },
   {
     label: 'SEO',
