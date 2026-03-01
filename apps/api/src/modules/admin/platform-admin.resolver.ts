@@ -1,6 +1,7 @@
 import { Resolver, Query, Mutation, Args, ID, Int } from '@nestjs/graphql';
 import { ObjectType, Field, Float, InputType } from '@nestjs/graphql';
 import { PlatformAdminService } from './platform-admin.service';
+import { OnboardHotelInput } from './dto/onboard-hotel.input';
 import { Hotel } from '../hotel/entities/hotel.entity';
 import { Booking } from '../booking/entities/booking.entity';
 import { Review } from '../review/entities/review.entity';
@@ -354,6 +355,28 @@ class CommissionsFilter {
 }
 
 // ============================================
+// Onboarding Result Type
+// ============================================
+
+@ObjectType()
+class OnboardHotelResult {
+  @Field()
+  success: boolean;
+
+  @Field()
+  message: string;
+
+  @Field(() => ID)
+  hotelId: string;
+
+  @Field()
+  hotelSlug: string;
+
+  @Field()
+  adminEmail: string;
+}
+
+// ============================================
 // Resolver
 // ============================================
 
@@ -514,5 +537,14 @@ export class PlatformAdminResolver {
   })
   async deleteReview(@Args('reviewId', { type: () => ID }) reviewId: string) {
     return this.platformService.deleteReview(reviewId);
+  }
+
+  // Onboarding
+  @Mutation(() => OnboardHotelResult, {
+    name: 'onboardHotel',
+    description: 'Self-serve hotel onboarding - creates hotel + admin account',
+  })
+  async onboardHotel(@Args('input') input: OnboardHotelInput) {
+    return this.platformService.onboardHotel(input);
   }
 }

@@ -69,7 +69,7 @@ export function CTASection() {
                 className="shadow-lg shadow-accent-500/25"
                 asChild
               >
-                <Link href="/for-hotels">
+                <Link href="/onboard">
                   List Your Property
                   <ArrowRight size={18} />
                 </Link>

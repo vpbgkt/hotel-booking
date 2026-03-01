@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class PlatformAdminService {
@@ -441,5 +442,110 @@ export class PlatformAdminService {
   async deleteReview(reviewId: string) {
     await this.prisma.review.delete({ where: { id: reviewId } });
     return { success: true, message: 'Review deleted' };
+  }
+
+  // ============================================
+  // Hotel Onboarding (Self-Serve)
+  // ============================================
+
+  async onboardHotel(input: {
+    // Hotel details
+    hotelName: string;
+    city: string;
+    state: string;
+    address: string;
+    pincode: string;
+    phone: string;
+    hotelEmail: string;
+    description?: string;
+    starRating?: number;
+    bookingModel?: string;
+    // Admin user details
+    adminName: string;
+    adminEmail: string;
+    adminPassword: string;
+    adminPhone?: string;
+    // Optional
+    domain?: string;
+  }) {
+    // Validate unique constraints
+    const slug = input.hotelName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    const [existingSlug, existingEmail] = await Promise.all([
+      this.prisma.hotel.findUnique({ where: { slug } }),
+      this.prisma.user.findFirst({ where: { email: input.adminEmail.toLowerCase() } }),
+    ]);
+
+    if (existingSlug) {
+      throw new ConflictException(`Hotel slug "${slug}" already exists. Choose a different name.`);
+    }
+    if (existingEmail) {
+      throw new ConflictException('Admin email already registered. Please use a different email or login.');
+    }
+
+    const hashedPassword = await bcrypt.hash(input.adminPassword, 12);
+
+    // Create everything in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Create hotel
+      const hotel = await tx.hotel.create({
+        data: {
+          name: input.hotelName,
+          slug,
+          description: input.description || null,
+          address: input.address,
+          city: input.city,
+          state: input.state,
+          country: 'India',
+          pincode: input.pincode,
+          phone: input.phone,
+          email: input.hotelEmail,
+          starRating: input.starRating || 3,
+          bookingModel: (input.bookingModel as any) || 'DAILY',
+          commissionRate: 0.10, // Default 10%
+          isActive: false, // Needs platform admin approval
+          isFeatured: false,
+        },
+      });
+
+      // 2. Create admin user linked to hotel
+      const adminUser = await tx.user.create({
+        data: {
+          name: input.adminName,
+          email: input.adminEmail.toLowerCase(),
+          phone: input.adminPhone || null,
+          password: hashedPassword,
+          role: 'HOTEL_ADMIN',
+          hotelId: hotel.id,
+          isActive: true,
+          emailVerified: false,
+          phoneVerified: false,
+        },
+      });
+
+      // 3. Optionally create domain mapping
+      if (input.domain) {
+        await tx.hotelDomain.create({
+          data: {
+            hotelId: hotel.id,
+            domain: input.domain.toLowerCase(),
+            isPrimary: true,
+          },
+        });
+      }
+
+      return { hotel, adminUser };
+    });
+
+    return {
+      success: true,
+      message: 'Hotel registered successfully! It will be reviewed and activated by the platform team.',
+      hotelId: result.hotel.id,
+      hotelSlug: result.hotel.slug,
+      adminEmail: result.adminUser.email,
+    };
   }
 }

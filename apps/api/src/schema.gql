@@ -309,6 +309,14 @@ input CreateHourlyBookingInput {
   specialRequests: String
 }
 
+input CreateReviewInput {
+  bookingId: ID!
+  comment: String
+  photos: [String!] = []
+  rating: Int!
+  title: String
+}
+
 input CreateRoomTypeInput {
   amenities: [String!]! = []
   basePriceDaily: Float!
@@ -433,6 +441,11 @@ input HotelPaginationInput {
   sortOrder: SortOrder = DESC
 }
 
+input HotelReplyInput {
+  reply: String!
+  reviewId: ID!
+}
+
 """Field to sort hotels by"""
 enum HotelSortBy {
   CREATED_AT
@@ -544,6 +557,9 @@ type Mutation {
   """Create an hourly booking"""
   createHourlyBooking(input: CreateHourlyBookingInput!): BookingResult!
 
+  """Submit a review for a completed booking"""
+  createReview(input: CreateReviewInput!): Review!
+
   """Create a new room type"""
   createRoomType(input: CreateRoomTypeInput!): RoomType!
 
@@ -564,6 +580,9 @@ type Mutation {
 
   """Logout and revoke refresh token"""
   logout: LogoutResponse!
+
+  """Self-serve hotel onboarding - creates hotel + admin account"""
+  onboardHotel(input: OnboardHotelInput!): OnboardHotelResult!
 
   """Approve a pending review"""
   platformApproveReview(reviewId: ID!): Review!
@@ -594,6 +613,9 @@ type Mutation {
 
   """Register a new user"""
   register(input: RegisterInput!): AuthResponse!
+
+  """Hotel admin replies to a guest review"""
+  replyToReview(input: HotelReplyInput!): Review!
 
   """Request OTP for phone login"""
   requestOTP(input: RequestOTPInput!): OTPResponse!
@@ -626,6 +648,50 @@ type Mutation {
 """OTP send response"""
 type OTPResponse {
   expiresAt: DateTime
+  message: String!
+  success: Boolean!
+}
+
+input OnboardHotelInput {
+  address: String!
+
+  """Admin email (for login)"""
+  adminEmail: String!
+
+  """Admin full name"""
+  adminName: String!
+
+  """Admin password"""
+  adminPassword: String!
+
+  """Admin phone number"""
+  adminPhone: String
+
+  """DAILY | HOURLY | BOTH"""
+  bookingModel: String = "DAILY"
+  city: String!
+  description: String
+
+  """Custom domain (e.g. myhotel.in)"""
+  domain: String
+
+  """Hotel contact email"""
+  hotelEmail: String!
+
+  """Hotel name"""
+  hotelName: String!
+
+  """Hotel phone number"""
+  phone: String!
+  pincode: String!
+  starRating: Int = 3
+  state: String!
+}
+
+type OnboardHotelResult {
+  adminEmail: String!
+  hotelId: ID!
+  hotelSlug: String!
   message: String!
   success: Boolean!
 }
@@ -820,6 +886,9 @@ type Query {
   """List bookings with filters"""
   bookings(filters: BookingFiltersInput, pagination: BookingPaginationInput): PaginatedBookings!
 
+  """Check if a booking can be reviewed"""
+  canReviewBooking(bookingId: ID!): Boolean!
+
   """Check room availability for daily booking"""
   checkDailyAvailability(input: CheckAvailabilityInput!): DailyAvailabilityResult!
 
@@ -832,11 +901,20 @@ type Query {
   """Get hotel by ID"""
   hotel(id: ID!): Hotel!
 
+  """Get all reviews for hotel (admin view, includes unpublished)"""
+  hotelAllReviews: [Review!]!
+
   """Get hotel by domain for white-label sites"""
   hotelByDomain(domain: String!): Hotel
 
   """Get hotel by slug"""
   hotelBySlug(slug: String!): Hotel
+
+  """Get review stats for a hotel"""
+  hotelReviewStats(hotelId: ID!): ReviewStats!
+
+  """Get published reviews for a hotel"""
+  hotelReviews(hotelId: ID!, limit: Int = 10, page: Int = 1, sortBy: String = "newest"): ReviewsPage!
 
   """Get paginated hotels"""
   hotels(filters: HotelFiltersInput, pagination: HotelPaginationInput): PaginatedHotels!
@@ -846,6 +924,9 @@ type Query {
 
   """Get current user's bookings"""
   myBookings(limit: Int = 10, offset: Int = 0): [Booking!]!
+
+  """Get all reviews submitted by the logged-in guest"""
+  myGuestReviews: [Review!]!
 
   """Get current user's reviews"""
   myReviews(limit: Int = 10, offset: Int = 0): [Review!]!
@@ -941,6 +1022,19 @@ type Review {
 type ReviewGuest {
   avatarUrl: String
   name: String!
+}
+
+type ReviewStats {
+  averageRating: Float!
+  ratingDistribution: [Int!]!
+  totalReviews: Int!
+}
+
+type ReviewsPage {
+  page: Int!
+  reviews: [Review!]!
+  total: Int!
+  totalPages: Int!
 }
 
 """Room inventory for a specific date"""

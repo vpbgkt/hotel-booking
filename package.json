@@ -21,12 +21,17 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "turbo": "^2.5.0",
     "prettier": "^3.5.0",
+    "turbo": "^2.5.0",
     "typescript": "^5.8.0"
   },
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "npm@11.6.2"
+  "packageManager": "npm@11.6.2",
+  "dependencies": {
+    "@types/compression": "^1.8.1",
+    "compression": "^1.8.1",
+    "helmet": "^8.1.0"
+  }
 }

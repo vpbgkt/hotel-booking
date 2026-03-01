@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { NotificationService } from '../notification/notification.service';
 import { 
   CreateDailyBookingInput, 
   CreateHourlyBookingInput,
@@ -27,6 +28,7 @@ export class BookingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly notifications: NotificationService,
   ) {}
 
   // Lock TTL: 30 seconds to complete booking transaction
@@ -670,6 +672,9 @@ export class BookingService {
 
     this.logger.log(`Cancelled booking ${booking.bookingNumber}`);
 
+    // Send cancellation notification (fire and forget)
+    this.notifications.notifyBookingCancelled(bookingId).catch(() => {});
+
     return updatedBooking;
   }
 
@@ -718,6 +723,13 @@ export class BookingService {
     this.logger.log(
       `Updated booking ${booking.bookingNumber} status to ${status}`
     );
+
+    // Send notifications based on status change (fire and forget)
+    if (status === BookingStatus.CONFIRMED) {
+      this.notifications.notifyBookingConfirmed(bookingId).catch(() => {});
+    } else if (status === BookingStatus.CHECKED_OUT) {
+      this.notifications.notifyCheckoutReviewPrompt(bookingId).catch(() => {});
+    }
 
     return updatedBooking;
   }

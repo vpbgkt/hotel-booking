@@ -7,6 +7,8 @@
 
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import helmet from 'helmet';
+import compression from 'compression';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -16,6 +18,17 @@ async function bootstrap() {
       ? ['error', 'warn'] 
       : ['log', 'error', 'warn', 'debug', 'verbose'],
   });
+
+  // Security headers via Helmet
+  app.use(
+    helmet({
+      contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
+
+  // Response compression
+  app.use(compression());
 
   // Global prefix for REST endpoints (GraphQL is at /graphql)
   app.setGlobalPrefix('api', {

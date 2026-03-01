@@ -234,3 +234,19 @@ export const DELETE_REVIEW = gql`
     }
   }
 `;
+
+// ============================================
+// Hotel Onboarding
+// ============================================
+
+export const ONBOARD_HOTEL = gql`
+  mutation OnboardHotel($input: OnboardHotelInput!) {
+    onboardHotel(input: $input) {
+      success
+      message
+      hotelId
+      hotelSlug
+      adminEmail
+    }
+  }
+`;

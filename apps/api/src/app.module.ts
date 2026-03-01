@@ -5,6 +5,7 @@
  */
 
 import { Module } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
@@ -25,6 +26,9 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { ReviewModule } from './modules/review/review.module';
+import { NotificationModule } from './modules/notification/notification.module';
+import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 // Health check
 import { HealthController } from './health.controller';
@@ -117,8 +121,15 @@ import { HealthController } from './health.controller';
     UserModule,
     PaymentModule,
     AdminModule,
+    ReviewModule,
+    NotificationModule,
   ],
   controllers: [HealthController],
-  providers: [],
+  providers: [
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: AuditLogInterceptor,
+    },
+  ],
 })
 export class AppModule {}

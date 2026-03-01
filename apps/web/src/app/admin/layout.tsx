@@ -24,6 +24,7 @@ import {
   IndianRupee,
   FileText,
   Search,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +53,11 @@ const adminLinks = [
     label: 'Analytics',
     href: '/admin/analytics',
     icon: BarChart3,
+  },
+  {
+    label: 'Reviews',
+    href: '/admin/reviews',
+    icon: MessageCircle,
   },
   {
     label: 'Content',
