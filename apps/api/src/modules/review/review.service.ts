@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RedisService } from '../redis/redis.service';
 import { NotificationService } from '../notification/notification.service';
 import { CreateReviewInput, HotelReplyInput } from './dto/review.input';
 
 @Injectable()
 export class ReviewService {
+  private readonly CACHE_TTL = 300; // 5 minutes
+
   constructor(
     private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
     private readonly notifications: NotificationService,
   ) {}
 
@@ -53,6 +57,10 @@ export class ReviewService {
       },
     });
 
+    // Invalidate review caches for this hotel
+    await this.redis.delPattern(`reviews:hotel:${booking.hotelId}:*`);
+    await this.redis.del(`reviews:stats:${booking.hotelId}`);
+
     // Notify hotel of new review (fire and forget)
     this.notifications.notifyNewReview(review.id).catch(() => {});
 
@@ -76,49 +84,65 @@ export class ReviewService {
           ? { rating: 'asc' as const }
           : { createdAt: 'desc' as const };
 
-    const [reviews, total] = await Promise.all([
-      this.prisma.review.findMany({
-        where: { hotelId, isPublished: true },
-        orderBy,
-        skip,
-        take: limit,
-        include: {
-          guest: { select: { name: true, avatarUrl: true } },
-        },
-      }),
-      this.prisma.review.count({ where: { hotelId, isPublished: true } }),
-    ]);
+    const cacheKey = `reviews:hotel:${hotelId}:${page}:${limit}:${sortBy}`;
 
-    return { reviews, total, page, totalPages: Math.ceil(total / limit) };
+    return this.redis.cacheOrFetch(
+      cacheKey,
+      async () => {
+        const [reviews, total] = await Promise.all([
+          this.prisma.review.findMany({
+            where: { hotelId, isPublished: true },
+            orderBy,
+            skip,
+            take: limit,
+            include: {
+              guest: { select: { name: true, avatarUrl: true } },
+            },
+          }),
+          this.prisma.review.count({ where: { hotelId, isPublished: true } }),
+        ]);
+
+        return { reviews, total, page, totalPages: Math.ceil(total / limit) };
+      },
+      this.CACHE_TTL,
+    );
   }
 
   /**
    * Get review stats for a hotel
    */
   async getReviewStats(hotelId: string) {
-    const reviews = await this.prisma.review.findMany({
-      where: { hotelId, isPublished: true },
-      select: { rating: true },
-    });
+    const cacheKey = `reviews:stats:${hotelId}`;
 
-    const total = reviews.length;
-    if (total === 0) {
-      return {
-        averageRating: 0,
-        totalReviews: 0,
-        ratingDistribution: [0, 0, 0, 0, 0],
-      };
-    }
+    return this.redis.cacheOrFetch(
+      cacheKey,
+      async () => {
+        const reviews = await this.prisma.review.findMany({
+          where: { hotelId, isPublished: true },
+          select: { rating: true },
+        });
 
-    const sum = reviews.reduce((a, r) => a + r.rating, 0);
-    const dist = [0, 0, 0, 0, 0];
-    reviews.forEach((r) => dist[r.rating - 1]++);
+        const total = reviews.length;
+        if (total === 0) {
+          return {
+            averageRating: 0,
+            totalReviews: 0,
+            ratingDistribution: [0, 0, 0, 0, 0],
+          };
+        }
 
-    return {
-      averageRating: Math.round((sum / total) * 10) / 10,
-      totalReviews: total,
-      ratingDistribution: dist,
-    };
+        const sum = reviews.reduce((a, r) => a + r.rating, 0);
+        const dist = [0, 0, 0, 0, 0];
+        reviews.forEach((r) => dist[r.rating - 1]++);
+
+        return {
+          averageRating: Math.round((sum / total) * 10) / 10,
+          totalReviews: total,
+          ratingDistribution: dist,
+        };
+      },
+      this.CACHE_TTL,
+    );
   }
 
   /**
@@ -132,13 +156,18 @@ export class ReviewService {
     if (!review) throw new NotFoundException('Review not found');
     if (review.hotelId !== hotelId) throw new ForbiddenException('Not your hotel review');
 
-    return this.prisma.review.update({
+    const updated = await this.prisma.review.update({
       where: { id: input.reviewId },
       data: { hotelReply: input.reply },
       include: {
         guest: { select: { name: true, avatarUrl: true } },
       },
     });
+
+    // Invalidate caches
+    await this.redis.delPattern(`reviews:hotel:${review.hotelId}:*`);
+
+    return updated;
   }
 
   /**

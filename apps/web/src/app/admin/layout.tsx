@@ -25,6 +25,7 @@ import {
   FileText,
   Search,
   MessageCircle,
+  Brain,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +49,11 @@ const adminLinks = [
     label: 'Pricing',
     href: '/admin/pricing',
     icon: IndianRupee,
+  },
+  {
+    label: 'Smart Pricing',
+    href: '/admin/smart-pricing',
+    icon: Brain,
   },
   {
     label: 'Analytics',

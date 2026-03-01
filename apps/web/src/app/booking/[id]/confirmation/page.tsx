@@ -1,68 +1,87 @@
+'use client';
+
 /**
  * Booking Confirmation Page
- * /booking/[id]/confirmation - Shows booking confirmation details
+ * /booking/[id]/confirmation - Shows booking confirmation details from real API
  */
 
-import { Metadata } from 'next';
+import { use } from 'react';
+import { useQuery } from '@apollo/client/react';
+import { GET_BOOKING } from '@/lib/graphql/queries/user';
 import Link from 'next/link';
 import { 
   CheckCircle, 
   Calendar, 
-  Clock, 
   MapPin, 
   User, 
   Download,
   Mail,
-  Phone
+  Phone,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface ConfirmationPageProps {
   params: Promise<{ id: string }>;
 }
 
-export const metadata: Metadata = {
-  title: 'Booking Confirmed - BlueStay',
-  description: 'Your hotel booking has been confirmed',
-};
-
-// Mock booking data - In production, fetch from API
-async function getBookingData(id: string) {
-  return {
-    id,
-    confirmationNumber: `BS${id.toUpperCase().slice(0, 8)}`,
-    status: 'CONFIRMED',
-    hotel: {
-      name: 'Radhika Beach Resort',
-      address: '123 Beach Road, Porbandar',
-      city: 'Porbandar',
-      state: 'Gujarat',
-      phone: '+91 98765 43210',
-      email: 'contact@radhikaresort.com',
-    },
-    room: {
-      name: 'Deluxe Sea View Room',
-    },
-    checkInDate: '2024-12-20',
-    checkInTime: '2:00 PM',
-    checkOutDate: '2024-12-22',
-    checkOutTime: '11:00 AM',
-    nights: 2,
-    guestCount: 2,
-    guestName: 'John Doe',
-    guestEmail: 'john@example.com',
-    guestPhone: '+91 98765 43210',
-    roomTotal: 5000,
-    taxes: 900,
-    total: 5900,
-    paymentMethod: 'Credit Card',
-    paidAt: new Date().toISOString(),
-  };
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount);
 }
 
-export default async function ConfirmationPage({ params }: ConfirmationPageProps) {
-  const { id } = await params;
-  const booking = await getBookingData(id);
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+export default function ConfirmationPage({ params }: ConfirmationPageProps) {
+  const { id } = use(params);
+
+  const { data, loading, error } = useQuery<{ booking: any }>(GET_BOOKING, {
+    variables: { id },
+  });
+
+  const booking = data?.booking;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-brand-600 mx-auto mb-3" />
+          <p className="text-gray-500">Loading confirmation...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !booking) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl p-8 max-w-md shadow-sm text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Booking Not Found</h2>
+          <p className="text-gray-500 text-sm mb-6">{error?.message || 'Unable to load booking.'}</p>
+          <Link href="/dashboard/bookings" className="text-brand-600 hover:text-brand-700 text-sm font-medium">
+            ← Back to Bookings
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const nights = booking.checkOutDate
+    ? Math.max(1, Math.ceil((new Date(booking.checkOutDate).getTime() - new Date(booking.checkInDate).getTime()) / 86400000))
+    : null;
+
+  const isConfirmed = booking.status === 'CONFIRMED' || booking.paymentStatus === 'PAID';
   
   return (
     <div className="min-h-screen bg-gray-50">
@@ -71,14 +90,16 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
           <div className="max-w-3xl mx-auto">
             {/* Success Header */}
             <div className="text-center mb-8">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-10 h-10 text-green-600" />
+              <div className={`w-20 h-20 ${isConfirmed ? 'bg-green-100' : 'bg-yellow-100'} rounded-full flex items-center justify-center mx-auto mb-4`}>
+                <CheckCircle className={`w-10 h-10 ${isConfirmed ? 'text-green-600' : 'text-yellow-600'}`} />
               </div>
               <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">
-                Booking Confirmed!
+                {isConfirmed ? 'Booking Confirmed!' : 'Booking Received'}
               </h1>
               <p className="text-gray-600">
-                Your reservation has been successfully booked
+                {isConfirmed
+                  ? 'Your reservation has been successfully booked'
+                  : 'Your booking is being processed'}
               </p>
             </div>
             
@@ -87,12 +108,14 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
               <div className="bg-brand-600 text-white px-6 py-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-brand-100 text-sm">Confirmation Number</p>
+                    <p className="text-brand-100 text-sm">Booking Number</p>
                     <p className="text-xl font-bold tracking-wide">
-                      {booking.confirmationNumber}
+                      {booking.bookingNumber}
                     </p>
                   </div>
-                  <div className="bg-white text-brand-600 px-3 py-1 rounded-full text-sm font-medium">
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    isConfirmed ? 'bg-white text-brand-600' : 'bg-yellow-400 text-yellow-900'
+                  }`}>
                     {booking.status}
                   </div>
                 </div>
@@ -102,25 +125,23 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
                 {/* Hotel Info */}
                 <div className="mb-6">
                   <h2 className="text-lg font-semibold text-gray-900 mb-3">
-                    {booking.hotel.name}
+                    {booking.hotel?.name || 'Hotel'}
                   </h2>
                   <div className="space-y-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-400" />
-                      <span>{booking.hotel.address}, {booking.hotel.city}, {booking.hotel.state}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-gray-400" />
-                      <a href={`tel:${booking.hotel.phone}`} className="text-brand-600 hover:underline">
-                        {booking.hotel.phone}
-                      </a>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <a href={`mailto:${booking.hotel.email}`} className="text-brand-600 hover:underline">
-                        {booking.hotel.email}
-                      </a>
-                    </div>
+                    {booking.hotel?.address && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span>{booking.hotel.address}, {booking.hotel.city}</span>
+                      </div>
+                    )}
+                    {booking.hotel?.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        <a href={`tel:${booking.hotel.phone}`} className="text-brand-600 hover:underline">
+                          {booking.hotel.phone}
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -132,24 +153,33 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
                         <Calendar className="w-4 h-4" />
                         Check-in
                       </div>
-                      <p className="font-semibold text-gray-900">{booking.checkInDate}</p>
-                      <p className="text-sm text-gray-500">After {booking.checkInTime}</p>
+                      <p className="font-semibold text-gray-900">{formatDate(booking.checkInDate)}</p>
+                      {booking.checkInTime && (
+                        <p className="text-sm text-gray-500">At {booking.checkInTime}</p>
+                      )}
                     </div>
                     
                     {/* Check-out */}
-                    <div>
-                      <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
-                        <Calendar className="w-4 h-4" />
-                        Check-out
+                    {booking.checkOutDate && (
+                      <div>
+                        <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
+                          <Calendar className="w-4 h-4" />
+                          Check-out
+                        </div>
+                        <p className="font-semibold text-gray-900">{formatDate(booking.checkOutDate)}</p>
+                        {booking.checkOutTime && (
+                          <p className="text-sm text-gray-500">By {booking.checkOutTime}</p>
+                        )}
                       </div>
-                      <p className="font-semibold text-gray-900">{booking.checkOutDate}</p>
-                      <p className="text-sm text-gray-500">Before {booking.checkOutTime}</p>
-                    </div>
+                    )}
                     
                     {/* Room */}
                     <div>
                       <div className="text-gray-500 text-sm mb-1">Room Type</div>
-                      <p className="font-semibold text-gray-900">{booking.room.name}</p>
+                      <p className="font-semibold text-gray-900">{booking.roomType?.name}</p>
+                      {booking.numRooms > 1 && (
+                        <p className="text-sm text-gray-500">{booking.numRooms} rooms</p>
+                      )}
                     </div>
                     
                     {/* Guests */}
@@ -158,7 +188,10 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
                         <User className="w-4 h-4" />
                         Guests
                       </div>
-                      <p className="font-semibold text-gray-900">{booking.guestCount} guest{booking.guestCount > 1 ? 's' : ''}</p>
+                      <p className="font-semibold text-gray-900">
+                        {booking.numGuests} guest{booking.numGuests > 1 ? 's' : ''}
+                        {booking.numExtraGuests > 0 && ` + ${booking.numExtraGuests} extra`}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -175,12 +208,22 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
                       <span className="text-gray-600">Email</span>
                       <span className="text-gray-900">{booking.guestEmail}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Phone</span>
-                      <span className="text-gray-900">{booking.guestPhone}</span>
-                    </div>
+                    {booking.guestPhone && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Phone</span>
+                        <span className="text-gray-900">{booking.guestPhone}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Special Requests */}
+                {booking.specialRequests && (
+                  <div className="border-t border-gray-100 pt-6 mt-6">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Special Requests</h3>
+                    <p className="text-sm text-gray-600">{booking.specialRequests}</p>
+                  </div>
+                )}
                 
                 {/* Payment Summary */}
                 <div className="border-t border-gray-100 pt-6 mt-6">
@@ -188,27 +231,35 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">
-                        Room ({booking.nights} night{booking.nights > 1 ? 's' : ''})
+                        Room{nights ? ` (${nights} night${nights > 1 ? 's' : ''})` : ''}
                       </span>
-                      <span className="text-gray-900">
-                        ₹{booking.roomTotal.toLocaleString('en-IN')}
-                      </span>
+                      <span className="text-gray-900">{formatCurrency(booking.roomTotal)}</span>
                     </div>
+                    {booking.extraGuestTotal > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Extra guests</span>
+                        <span className="text-gray-900">{formatCurrency(booking.extraGuestTotal)}</span>
+                      </div>
+                    )}
+                    {booking.discountAmount > 0 && (
+                      <div className="flex justify-between text-green-600">
+                        <span>Discount</span>
+                        <span>−{formatCurrency(booking.discountAmount)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-gray-600">Taxes & fees</span>
-                      <span className="text-gray-900">
-                        ₹{booking.taxes.toLocaleString('en-IN')}
-                      </span>
+                      <span className="text-gray-900">{formatCurrency(booking.taxes)}</span>
                     </div>
                     <div className="flex justify-between pt-2 border-t border-gray-100">
-                      <span className="font-semibold text-gray-900">Total Paid</span>
-                      <span className="font-bold text-gray-900">
-                        ₹{booking.total.toLocaleString('en-IN')}
-                      </span>
+                      <span className="font-semibold text-gray-900">Total</span>
+                      <span className="font-bold text-gray-900">{formatCurrency(booking.totalAmount)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-gray-500">
-                      <span>Payment Method</span>
-                      <span>{booking.paymentMethod}</span>
+                      <span>Payment Status</span>
+                      <span className={booking.paymentStatus === 'PAID' ? 'text-green-600 font-medium' : ''}>
+                        {booking.paymentStatus}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -217,12 +268,15 @@ export default async function ConfirmationPage({ params }: ConfirmationPageProps
             
             {/* Actions */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button variant="outline" className="flex items-center gap-2">
+              <button className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                 <Download className="w-4 h-4" />
                 Download Receipt
-              </Button>
-              <Link href="/bookings">
-                <Button>View All Bookings</Button>
+              </button>
+              <Link
+                href="/dashboard/bookings"
+                className="inline-flex items-center justify-center px-6 py-3 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700"
+              >
+                View All Bookings
               </Link>
             </div>
             

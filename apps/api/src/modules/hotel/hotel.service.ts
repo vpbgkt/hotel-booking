@@ -47,10 +47,7 @@ export class HotelService {
               domains: true,
               roomTypes: {
                 where: { isActive: true },
-                select: {
-                  basePriceDaily: true,
-                  basePriceHourly: true,
-                },
+                orderBy: { sortOrder: 'asc' },
               },
               reviews: {
                 where: { isPublished: true },

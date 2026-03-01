@@ -131,3 +131,57 @@ export const DEACTIVATE_ACCOUNT = gql`
     }
   }
 `;
+
+export const GET_BOOKING = gql`
+  query GetBooking($id: ID!) {
+    booking(id: $id) {
+      id
+      bookingNumber
+      bookingType
+      status
+      paymentStatus
+      checkInDate
+      checkOutDate
+      checkInTime
+      checkOutTime
+      numHours
+      numGuests
+      numRooms
+      numExtraGuests
+      roomTotal
+      extraGuestTotal
+      taxes
+      discountAmount
+      totalAmount
+      guestName
+      guestEmail
+      guestPhone
+      specialRequests
+      cancellationReason
+      cancelledAt
+      createdAt
+      hotel {
+        id
+        name
+        slug
+        address
+        city
+        phone
+      }
+      roomType {
+        id
+        name
+        slug
+        images
+      }
+      payments {
+        id
+        gateway
+        amount
+        currency
+        status
+        createdAt
+      }
+    }
+  }
+`;

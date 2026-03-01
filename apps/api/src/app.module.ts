@@ -28,6 +28,7 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { ReviewModule } from './modules/review/review.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { SmartPricingModule } from './modules/pricing/smart-pricing.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 // Health check
@@ -123,6 +124,7 @@ import { HealthController } from './health.controller';
     AdminModule,
     ReviewModule,
     NotificationModule,
+    SmartPricingModule,
   ],
   controllers: [HealthController],
   providers: [

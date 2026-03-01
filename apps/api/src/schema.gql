@@ -24,6 +24,16 @@ type AdminDashboardStats {
   totalRooms: Int!
 }
 
+input ApplyPriceSuggestionsInput {
+  roomTypeId: String!
+  suggestions: [PriceApplyItem!]!
+}
+
+type ApplySuggestionsResult {
+  applied: Int!
+  skipped: Int!
+}
+
 """Auth response with tokens"""
 type AuthResponse {
   accessToken: String
@@ -343,6 +353,11 @@ type DailyAvailabilityResult {
   unavailableRoomTypes: [RoomTypeAvailability!]!
 }
 
+type DateRange {
+  from: String!
+  to: String!
+}
+
 """
 A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
 """
@@ -539,6 +554,9 @@ type MonthlyDataPoint {
 }
 
 type Mutation {
+  """Apply pricing suggestions to room inventory"""
+  applyPriceSuggestions(input: ApplyPriceSuggestionsInput!): ApplySuggestionsResult!
+
   """Bulk update pricing and availability for a date range"""
   bulkUpdateInventory(input: BulkInventoryUpdateInput!): BulkUpdateResult!
 
@@ -650,6 +668,17 @@ type OTPResponse {
   expiresAt: DateTime
   message: String!
   success: Boolean!
+}
+
+type OccupancyForecastDay {
+  date: String!
+  occupancyRate: Float!
+  revenue: Float!
+}
+
+input OccupancyForecastInput {
+  days: Int = 30
+  hotelId: String!
 }
 
 input OnboardHotelInput {
@@ -855,6 +884,37 @@ type PopularCity {
   state: String!
 }
 
+input PriceApplyItem {
+  date: String!
+  price: Float!
+}
+
+type PriceSuggestionGQL {
+  changePercent: Float!
+  currentPrice: Float!
+  date: String!
+  demandLevel: String!
+  occupancyRate: Float!
+  reason: String!
+  suggestedPrice: Float!
+}
+
+input PriceSuggestionsInput {
+  fromDate: String!
+  roomTypeId: String!
+  toDate: String!
+}
+
+type PricingAnalysisGQL {
+  averageOccupancy: Float!
+  basePrice: Float!
+  period: DateRange!
+  revenue: RevenueProjection!
+  roomTypeId: String!
+  roomTypeName: String!
+  suggestions: [PriceSuggestionGQL!]!
+}
+
 type Query {
   """Get hotel analytics data"""
   adminAnalytics(hotelId: ID!, months: Int = 6): AdminAnalytics!
@@ -931,6 +991,9 @@ type Query {
   """Get current user's reviews"""
   myReviews(limit: Int = 10, offset: Int = 0): [Review!]!
 
+  """Get occupancy forecast for the next N days"""
+  occupancyForecast(input: OccupancyForecastInput!): [OccupancyForecastDay!]!
+
   """Get all payments for a booking"""
   paymentsByBooking(bookingId: ID!): [Payment!]!
 
@@ -951,6 +1014,9 @@ type Query {
 
   """Get popular cities"""
   popularCities(limit: Float = 10): [PopularCity!]!
+
+  """Get AI-powered pricing suggestions for a room type"""
+  priceSuggestions(input: PriceSuggestionsInput!): PricingAnalysisGQL!
 
   """Get room type by ID"""
   roomType(id: ID!): RoomType!
@@ -999,6 +1065,12 @@ input RegisterInput {
 """Request OTP for phone login"""
 input RequestOTPInput {
   phone: String!
+}
+
+type RevenueProjection {
+  current: Float!
+  projected: Float!
+  uplift: Float!
 }
 
 """Guest review entity"""

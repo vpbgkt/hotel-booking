@@ -270,3 +270,55 @@ export const GET_ADMIN_ANALYTICS = gql`
     }
   }
 `;
+
+// ============================================
+// Smart Pricing
+// ============================================
+
+export const GET_PRICE_SUGGESTIONS = gql`
+  query GetPriceSuggestions($input: PriceSuggestionsInput!) {
+    priceSuggestions(input: $input) {
+      roomTypeId
+      roomTypeName
+      basePrice
+      averageOccupancy
+      period {
+        from
+        to
+      }
+      suggestions {
+        date
+        currentPrice
+        suggestedPrice
+        changePercent
+        demandLevel
+        occupancyRate
+        reason
+      }
+      revenue {
+        current
+        projected
+        uplift
+      }
+    }
+  }
+`;
+
+export const APPLY_PRICE_SUGGESTIONS = gql`
+  mutation ApplyPriceSuggestions($input: ApplyPriceSuggestionsInput!) {
+    applyPriceSuggestions(input: $input) {
+      applied
+      skipped
+    }
+  }
+`;
+
+export const GET_OCCUPANCY_FORECAST = gql`
+  query GetOccupancyForecast($input: OccupancyForecastInput!) {
+    occupancyForecast(input: $input) {
+      date
+      occupancyRate
+      revenue
+    }
+  }
+`;
