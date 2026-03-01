@@ -18,6 +18,7 @@ import {
   Heart,
   Settings,
   CreditCard,
+  Star,
   Loader2 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -34,19 +35,14 @@ const sidebarLinks = [
     icon: CalendarDays,
   },
   {
-    label: 'Saved Hotels',
-    href: '/dashboard/favorites',
-    icon: Heart,
+    label: 'My Reviews',
+    href: '/dashboard/reviews',
+    icon: Star,
   },
   {
     label: 'Profile',
     href: '/dashboard/profile',
     icon: User,
-  },
-  {
-    label: 'Payment Methods',
-    href: '/dashboard/payments',
-    icon: CreditCard,
   },
   {
     label: 'Settings',

@@ -6,6 +6,7 @@
  */
 
 import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client/core';
+import { setContext } from '@apollo/client/link/context';
 import { ApolloProvider } from '@apollo/client/react';
 import { useMemo } from 'react';
 
@@ -13,6 +14,22 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/graphq
 
 export function ApolloWrapper({ children }: { children: React.ReactNode }) {
   const client = useMemo(() => {
+    const httpLink = new HttpLink({
+      uri: API_URL,
+    });
+
+    const authLink = setContext((_, { headers }) => {
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem('accessToken') 
+        : null;
+      return {
+        headers: {
+          ...headers,
+          ...(token ? { authorization: `Bearer ${token}` } : {}),
+        },
+      };
+    });
+
     return new ApolloClient({
       cache: new InMemoryCache({
         typePolicies: {
@@ -35,11 +52,15 @@ export function ApolloWrapper({ children }: { children: React.ReactNode }) {
           Hotel: { keyFields: ['id'] },
           RoomType: { keyFields: ['id'] },
           Booking: { keyFields: ['id'] },
+          Review: { keyFields: ['id'] },
         },
       }),
-      link: new HttpLink({
-        uri: API_URL,
-      }),
+      link: authLink.concat(httpLink),
+      defaultOptions: {
+        watchQuery: {
+          fetchPolicy: 'cache-and-network',
+        },
+      },
     });
   }, []);
 

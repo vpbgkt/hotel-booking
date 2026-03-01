@@ -2,11 +2,13 @@
 
 /**
  * Profile Page - BlueStay Dashboard
- * User profile management
+ * User profile management — wired to real GraphQL API
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useQuery, useMutation } from '@apollo/client/react';
+import { USER_PROFILE, UPDATE_PROFILE, DEACTIVATE_ACCOUNT } from '@/lib/graphql/queries/user';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,28 +17,65 @@ import {
   User, 
   Mail, 
   Phone, 
-  MapPin,
   Camera,
   Loader2,
   Check,
-  AlertCircle
+  AlertCircle,
+  Shield,
+  ShieldCheck,
+  LogOut
 } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [showDeactivate, setShowDeactivate] = useState(false);
+
+  const { data: profileData, loading: profileLoading, refetch } = useQuery(USER_PROFILE, {
+    skip: !user,
+  });
+
+  const profile = profileData?.userProfile;
 
   const [formData, setFormData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    address: '',
-    city: '',
-    state: '',
-    pincode: '',
+    name: '',
+    email: '',
+    phone: '',
+  });
+
+  // Populate form when profile loads
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        name: profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+      });
+    }
+  }, [profile]);
+
+  const [updateProfile, { loading: saving }] = useMutation(UPDATE_PROFILE, {
+    onCompleted: () => {
+      setSuccess('Profile updated successfully!');
+      setIsEditing(false);
+      setError('');
+      refetch();
+      setTimeout(() => setSuccess(''), 3000);
+    },
+    onError: (err) => {
+      setError(err.message || 'Failed to update profile. Please try again.');
+    },
+  });
+
+  const [deactivateAccount, { loading: deactivating }] = useMutation(DEACTIVATE_ACCOUNT, {
+    onCompleted: () => {
+      logout();
+    },
+    onError: (err) => {
+      setError(err.message || 'Failed to deactivate account.');
+    },
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,21 +85,40 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSaving(true);
     setError('');
     setSuccess('');
 
-    try {
-      // TODO: Implement profile update mutation
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setSuccess('Profile updated successfully!');
+    const input: Record<string, string> = {};
+    if (formData.name !== profile?.name) input.name = formData.name;
+    if (formData.phone !== (profile?.phone || '')) input.phone = formData.phone;
+
+    if (Object.keys(input).length === 0) {
       setIsEditing(false);
-    } catch (err) {
-      setError('Failed to update profile. Please try again.');
-    } finally {
-      setIsSaving(false);
+      return;
+    }
+
+    updateProfile({ variables: { input } });
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+    setError('');
+    if (profile) {
+      setFormData({
+        name: profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+      });
     }
   };
+
+  if (profileLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -77,7 +135,11 @@ export default function ProfilePage() {
             {/* Avatar */}
             <div className="relative">
               <div className="w-24 h-24 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white text-3xl font-bold">
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
+                {profile?.avatarUrl ? (
+                  <img src={profile.avatarUrl} alt={profile.name} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  profile?.name?.charAt(0).toUpperCase() || 'U'
+                )}
               </div>
               <button className="absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-md hover:shadow-lg transition-shadow">
                 <Camera size={16} className="text-gray-600" />
@@ -86,16 +148,33 @@ export default function ProfilePage() {
 
             {/* User Info */}
             <div className="flex-1">
-              <h2 className="text-xl font-semibold text-gray-900">{user?.name}</h2>
-              <p className="text-gray-500">{user?.email}</p>
-              <div className="flex items-center gap-2 mt-2">
+              <h2 className="text-xl font-semibold text-gray-900">{profile?.name}</h2>
+              <p className="text-gray-500">{profile?.email}</p>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <span className="px-2 py-1 bg-brand-100 text-brand-700 text-xs font-medium rounded-full capitalize">
-                  {user?.role?.toLowerCase() || 'guest'}
+                  {profile?.role?.toLowerCase().replace('_', ' ') || 'guest'}
                 </span>
+                {profile?.emailVerified && (
+                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
+                    <ShieldCheck size={12} /> Email Verified
+                  </span>
+                )}
+                {profile?.phoneVerified && (
+                  <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
+                    <ShieldCheck size={12} /> Phone Verified
+                  </span>
+                )}
                 <span className="text-sm text-gray-500">
-                  Member since {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
+                  Member since {profile?.createdAt
+                    ? new Date(profile.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+                    : '-'}
                 </span>
               </div>
+              {profile?.lastLoginAt && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Last login: {new Date(profile.lastLoginAt).toLocaleString('en-IN')}
+                </p>
+              )}
             </div>
 
             {/* Edit Button */}
@@ -157,8 +236,7 @@ export default function ProfilePage() {
                   name="email"
                   type="email"
                   value={formData.email}
-                  onChange={handleChange}
-                  disabled={true} // Email typically can't be changed
+                  disabled={true}
                   className="mt-1"
                 />
                 <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
@@ -181,71 +259,6 @@ export default function ProfilePage() {
                   className="mt-1"
                 />
               </div>
-
-              {/* Address */}
-              <div>
-                <Label htmlFor="address" className="flex items-center gap-2 text-gray-700">
-                  <MapPin size={16} />
-                  Address
-                </Label>
-                <Input
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  placeholder="Street address"
-                  className="mt-1"
-                />
-              </div>
-
-              {/* City */}
-              <div>
-                <Label htmlFor="city" className="text-gray-700">
-                  City
-                </Label>
-                <Input
-                  id="city"
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  placeholder="City"
-                  className="mt-1"
-                />
-              </div>
-
-              {/* State */}
-              <div>
-                <Label htmlFor="state" className="text-gray-700">
-                  State
-                </Label>
-                <Input
-                  id="state"
-                  name="state"
-                  value={formData.state}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  placeholder="State"
-                  className="mt-1"
-                />
-              </div>
-
-              {/* Pincode */}
-              <div>
-                <Label htmlFor="pincode" className="text-gray-700">
-                  PIN Code
-                </Label>
-                <Input
-                  id="pincode"
-                  name="pincode"
-                  value={formData.pincode}
-                  onChange={handleChange}
-                  disabled={!isEditing}
-                  placeholder="PIN Code"
-                  className="mt-1"
-                />
-              </div>
             </div>
 
             {/* Form Actions */}
@@ -254,24 +267,13 @@ export default function ProfilePage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => {
-                    setIsEditing(false);
-                    setFormData({
-                      name: user?.name || '',
-                      email: user?.email || '',
-                      phone: user?.phone || '',
-                      address: '',
-                      city: '',
-                      state: '',
-                      pincode: '',
-                    });
-                  }}
-                  disabled={isSaving}
+                  onClick={handleCancel}
+                  disabled={saving}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isSaving}>
-                  {isSaving ? (
+                <Button type="submit" disabled={saving}>
+                  {saving ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                       Saving...
@@ -289,13 +291,16 @@ export default function ProfilePage() {
       {/* Security Section */}
       <Card className="border-0 shadow-sm">
         <CardHeader>
-          <CardTitle className="text-lg">Security</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Shield size={20} />
+            Security
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
             <div>
               <h4 className="font-medium text-gray-900">Password</h4>
-              <p className="text-sm text-gray-500">Last changed 30 days ago</p>
+              <p className="text-sm text-gray-500">Change your account password</p>
             </div>
             <Button variant="outline" size="sm">
               Change Password
@@ -319,17 +324,54 @@ export default function ProfilePage() {
           <CardTitle className="text-lg text-red-600">Danger Zone</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
-            <div>
-              <h4 className="font-medium text-red-900">Delete Account</h4>
-              <p className="text-sm text-red-600">
-                Permanently delete your account and all associated data
+          {showDeactivate ? (
+            <div className="p-4 bg-red-50 rounded-lg">
+              <h4 className="font-medium text-red-900 mb-2">Are you sure?</h4>
+              <p className="text-sm text-red-600 mb-4">
+                This will deactivate your account. You will lose access to all your bookings and data.
               </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeactivate(false)}
+                  disabled={deactivating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={() => deactivateAccount()}
+                  disabled={deactivating}
+                >
+                  {deactivating ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <LogOut size={14} className="mr-2" />
+                  )}
+                  Deactivate Account
+                </Button>
+              </div>
             </div>
-            <Button variant="outline" size="sm" className="text-red-600 border-red-300 hover:bg-red-100">
-              Delete Account
-            </Button>
-          </div>
+          ) : (
+            <div className="flex items-center justify-between p-4 bg-red-50 rounded-lg">
+              <div>
+                <h4 className="font-medium text-red-900">Deactivate Account</h4>
+                <p className="text-sm text-red-600">
+                  Permanently deactivate your account and lose access
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-red-600 border-red-300 hover:bg-red-100"
+                onClick={() => setShowDeactivate(true)}
+              >
+                Deactivate Account
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
