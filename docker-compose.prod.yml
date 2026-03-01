@@ -1,0 +1,194 @@
+# BlueStay - Production Docker Compose
+# Usage: docker compose -f docker-compose.prod.yml up -d
+#
+# Requirements:
+#   - Copy .env.production.example to .env.production and fill in values
+#   - Ensure SSL certificates exist at ./nginx/certs/
+#   - Build images first: docker compose -f docker-compose.prod.yml build
+
+version: '3.9'
+
+services:
+  # ============================================
+  # REVERSE PROXY (Nginx)
+  # ============================================
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: bluestay-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_started
+    networks:
+      - bluestay
+
+  # ============================================
+  # DATABASE
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: bluestay-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bluestay}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-bluestay}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bluestay}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bluestay
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ============================================
+  # CACHE & SESSION STORE
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: bluestay-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --requirepass ${REDIS_PASSWORD}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bluestay
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # ============================================
+  # API (NestJS)
+  # ============================================
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: production
+    container_name: bluestay-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bluestay}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-bluestay}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@bluestay.in}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+    expose:
+      - "4000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/graphql?query=%7B__typename%7D || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bluestay
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ============================================
+  # WEB (Next.js)
+  # ============================================
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_RAZORPAY_KEY: ${NEXT_PUBLIC_RAZORPAY_KEY:-}
+    container_name: bluestay-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_URL: http://api:4000/graphql
+    expose:
+      - "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - bluestay
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # ============================================
+  # DB MIGRATIONS (run once)
+  # ============================================
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: builder
+    container_name: bluestay-migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bluestay}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-bluestay}
+    command: sh -c "cd apps/api && npx prisma migrate deploy"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bluestay
+    profiles:
+      - migrate
+
+volumes:
+  postgres_data:
+  redis_data:
+  nginx_logs:
+
+networks:
+  bluestay:
+    name: bluestay-network
+    driver: bridge

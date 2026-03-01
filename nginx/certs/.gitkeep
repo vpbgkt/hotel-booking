@@ -1,0 +1,12 @@
+# This directory should contain SSL certificates.
+# Use Let's Encrypt / certbot for free certificates.
+#
+# Files expected:
+#   bluestay.in.crt
+#   bluestay.in.key
+#   api.bluestay.in.crt
+#   api.bluestay.in.key
+#
+# Generate with certbot:
+#   certbot certonly --standalone -d bluestay.in -d www.bluestay.in
+#   certbot certonly --standalone -d api.bluestay.in

@@ -43,3 +43,9 @@ prisma/generated
 # Misc
 *.tsbuildinfo
 .eslintcache
+
+# Production secrets
+.env.production
+nginx/certs/*.crt
+nginx/certs/*.key
+nginx/certs/*.pem

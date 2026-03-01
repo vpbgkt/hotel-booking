@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import * as nodemailer from 'nodemailer';
 
 export interface EmailPayload {
   to: string;
@@ -19,21 +20,58 @@ export type NotificationType =
   | 'HOTEL_ONBOARDED';
 
 @Injectable()
-export class NotificationService {
+export class NotificationService implements OnModuleInit {
   private readonly logger = new Logger(NotificationService.name);
+  private transporter: nodemailer.Transporter | null = null;
+  private fromAddress: string;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {
+    this.fromAddress = process.env.SMTP_FROM || 'BlueStay <noreply@bluestay.in>';
+  }
+
+  onModuleInit() {
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = process.env.SMTP_PORT;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (smtpHost && smtpUser && smtpPass) {
+      this.transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: parseInt(smtpPort || '587', 10),
+        secure: (smtpPort || '587') === '465',
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+      this.logger.log(`📧 SMTP configured: ${smtpHost}:${smtpPort || 587}`);
+    } else {
+      this.logger.warn('📧 SMTP not configured — emails will be logged only. Set SMTP_HOST, SMTP_USER, SMTP_PASS env vars.');
+    }
+  }
 
   /**
-   * Send a notification (email). In dev it logs; in production use Resend/SMTP.
+   * Send a notification email.
+   * Uses SMTP if configured, otherwise logs the email for development.
    */
   async sendEmail(payload: EmailPayload): Promise<boolean> {
     try {
-      // In production, this would call Resend or SMTP
-      // For now, log the email so it's visible during development
-      this.logger.log(`📧 Email to: ${payload.to}`);
-      this.logger.log(`   Subject: ${payload.subject}`);
-      this.logger.debug(`   Body: ${payload.html.substring(0, 200)}...`);
+      if (this.transporter) {
+        await this.transporter.sendMail({
+          from: this.fromAddress,
+          to: payload.to,
+          subject: payload.subject,
+          html: payload.html,
+          text: payload.text,
+        });
+        this.logger.log(`📧 Email sent to: ${payload.to} | Subject: ${payload.subject}`);
+      } else {
+        // Dev mode: log the email
+        this.logger.log(`📧 [DEV] Email to: ${payload.to}`);
+        this.logger.log(`   Subject: ${payload.subject}`);
+        this.logger.debug(`   Body: ${payload.html.substring(0, 200)}...`);
+      }
       return true;
     } catch (error) {
       this.logger.error(`Failed to send email to ${payload.to}`, error);

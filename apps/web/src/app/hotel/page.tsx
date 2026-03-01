@@ -99,8 +99,42 @@ export default function TenantHomePage() {
 
   const activeRooms = hotel.roomTypes?.filter((r) => r.isActive) || [];
 
+  // JSON-LD structured data
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Hotel',
+    name: hotel.name,
+    description: hotel.description,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: hotel.address,
+      addressLocality: hotel.city,
+      addressRegion: hotel.state,
+      postalCode: hotel.pincode,
+      addressCountry: 'IN',
+    },
+    starRating: { '@type': 'Rating', ratingValue: hotel.starRating },
+    ...(hotel.averageRating && {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: hotel.averageRating,
+        reviewCount: hotel.reviewCount || 0,
+        bestRating: 5,
+      },
+    }),
+    ...(hotel.heroImageUrl && { image: hotel.heroImageUrl }),
+    ...(hotel.phone && { telephone: hotel.phone }),
+    ...(hotel.email && { email: hotel.email }),
+    checkinTime: hotel.checkInTime || '14:00',
+    checkoutTime: hotel.checkOutTime || '12:00',
+  };
+
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* =================== HERO SECTION =================== */}
       <section className="relative h-[70vh] min-h-[500px] flex items-end">
         {hotel.heroImageUrl ? (
