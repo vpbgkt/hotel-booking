@@ -22,6 +22,7 @@ import {
   Phone,
   Clock,
   Image as ImageIcon,
+  CalendarDays,
 } from 'lucide-react';
 
 interface HotelData {
@@ -38,8 +39,11 @@ interface HotelData {
   heroImageUrl?: string;
   logoUrl?: string;
   starRating: number;
+  bookingModel: string;
   checkInTime: string;
   checkOutTime: string;
+  hourlyMinHours: number;
+  hourlyMaxHours: number;
   latitude?: number;
   longitude?: number;
 }
@@ -80,8 +84,11 @@ export default function AdminSettingsPage() {
         heroImageUrl: h.heroImageUrl || '',
         logoUrl: h.logoUrl || '',
         starRating: h.starRating,
+        bookingModel: h.bookingModel || 'DAILY',
         checkInTime: h.checkInTime,
         checkOutTime: h.checkOutTime,
+        hourlyMinHours: h.hourlyMinHours ?? 3,
+        hourlyMaxHours: h.hourlyMaxHours ?? 12,
         latitude: h.latitude,
         longitude: h.longitude,
       });
@@ -106,8 +113,11 @@ export default function AdminSettingsPage() {
           heroImageUrl: form.heroImageUrl || undefined,
           logoUrl: form.logoUrl || undefined,
           starRating: form.starRating,
+          bookingModel: form.bookingModel,
           checkInTime: form.checkInTime,
           checkOutTime: form.checkOutTime,
+          hourlyMinHours: form.bookingModel !== 'DAILY' ? form.hourlyMinHours : undefined,
+          hourlyMaxHours: form.bookingModel !== 'DAILY' ? form.hourlyMaxHours : undefined,
           latitude: form.latitude ? Number(form.latitude) : undefined,
           longitude: form.longitude ? Number(form.longitude) : undefined,
         },
@@ -348,6 +358,81 @@ export default function AdminSettingsPage() {
                 />
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Booking Model Configuration */}
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-brand-600" />
+              Booking Model
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Booking Type</label>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: 'DAILY', label: 'Daily Only', desc: 'Traditional check-in/check-out by date' },
+                  { value: 'HOURLY', label: 'Hourly Only', desc: 'Book rooms by the hour' },
+                  { value: 'BOTH', label: 'Both', desc: 'Guests choose daily or hourly' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => updateField('bookingModel', opt.value)}
+                    className={`p-3 rounded-lg border-2 text-left transition-all ${
+                      form.bookingModel === opt.value
+                        ? 'border-brand-500 bg-brand-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="font-medium text-sm">{opt.label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{opt.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {form.bookingModel !== 'DAILY' && (
+              <div className="bg-blue-50 rounded-lg p-4 space-y-4">
+                <h4 className="text-sm font-medium text-blue-800">Hourly Booking Settings</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Minimum Hours
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={form.hourlyMinHours ?? 3}
+                      onChange={(e) => updateField('hourlyMinHours', parseInt(e.target.value) || 3)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Minimum booking duration</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Maximum Hours
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={form.hourlyMaxHours ?? 12}
+                      onChange={(e) => updateField('hourlyMaxHours', parseInt(e.target.value) || 12)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Maximum booking duration</p>
+                  </div>
+                </div>
+                <p className="text-xs text-blue-600">
+                  Hourly pricing is set per room type in the Rooms section.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

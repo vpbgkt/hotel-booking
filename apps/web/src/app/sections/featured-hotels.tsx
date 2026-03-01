@@ -1,104 +1,33 @@
 "use client";
 
+/**
+ * Featured Hotels Section
+ * Fetches and displays featured hotels from the API
+ */
+
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useQuery } from "@apollo/client/react";
 import { Button } from "@/components/ui/button";
 import { HotelCard } from "@/components/hotel/hotel-card";
-
-/**
- * Mock data for featured hotels
- * In production, this will come from the API
- */
-const FEATURED_HOTELS = [
-  {
-    id: "1",
-    slug: "radhika-resort-goa",
-    name: "Radhika Resort & Spa",
-    location: "Calangute, Goa",
-    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80",
-    rating: 4.7,
-    reviewCount: 243,
-    price: 3500,
-    originalPrice: 4500,
-    hasHourlyBooking: true,
-    hourlyPrice: 600,
-    amenities: ["wifi", "parking", "breakfast"],
-    isFeatured: true,
-  },
-  {
-    id: "2",
-    slug: "taj-lakefront-udaipur",
-    name: "Lakefront Heritage Hotel",
-    location: "Lake Pichola, Udaipur",
-    image: "https://images.unsplash.com/photo-1582719508461-905c673771fd?w=800&q=80",
-    rating: 4.9,
-    reviewCount: 512,
-    price: 8500,
-    amenities: ["wifi", "parking", "breakfast"],
-    isFeatured: true,
-  },
-  {
-    id: "3",
-    slug: "mountain-view-manali",
-    name: "Mountain View Resort",
-    location: "Old Manali, Himachal",
-    image: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&q=80",
-    rating: 4.5,
-    reviewCount: 189,
-    price: 2800,
-    originalPrice: 3200,
-    amenities: ["wifi", "breakfast"],
-    isLimitedAvailability: true,
-  },
-  {
-    id: "4",
-    slug: "beachside-villa-kerala",
-    name: "Beachside Villa & Ayurveda",
-    location: "Kovalam, Kerala",
-    image: "https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?w=800&q=80",
-    rating: 4.6,
-    reviewCount: 156,
-    price: 4200,
-    hasHourlyBooking: true,
-    hourlyPrice: 700,
-    amenities: ["wifi", "parking", "breakfast"],
-  },
-  {
-    id: "5",
-    slug: "royal-palace-jaipur",
-    name: "Royal Palace Heritage",
-    location: "Pink City, Jaipur",
-    image: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&q=80",
-    rating: 4.8,
-    reviewCount: 324,
-    price: 6500,
-    originalPrice: 8000,
-    amenities: ["wifi", "parking", "breakfast"],
-    isFeatured: true,
-  },
-  {
-    id: "6",
-    slug: "urban-suites-mumbai",
-    name: "Urban Suites Mumbai",
-    location: "Bandra, Mumbai",
-    image: "https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=800&q=80",
-    rating: 4.4,
-    reviewCount: 98,
-    price: 5500,
-    hasHourlyBooking: true,
-    hourlyPrice: 900,
-    amenities: ["wifi", "parking"],
-  },
-];
+import { GET_FEATURED_HOTELS } from "@/lib/graphql/queries/hotels";
 
 /**
  * Featured Hotels Section
  * 
  * Displays a grid of featured/promoted hotels
- * with animated entrance and responsive layout
+ * with animated entrance and responsive layout.
+ * Data fetched from the API via GET_FEATURED_HOTELS query.
  */
 export function FeaturedHotels() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, loading } = useQuery<any>(GET_FEATURED_HOTELS, {
+    variables: { limit: 6 },
+  });
+
+  const hotels = data?.featuredHotels || [];
+
   return (
     <section className="section bg-gray-50">
       <div className="container-app">
@@ -137,19 +66,56 @@ export function FeaturedHotels() {
         </div>
 
         {/* Hotels Grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {FEATURED_HOTELS.map((hotel, index) => (
-            <motion.div
-              key={hotel.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: index * 0.1 }}
-            >
-              <HotelCard {...hotel} />
-            </motion.div>
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
+          </div>
+        ) : hotels.length > 0 ? (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {hotels.map((hotel: {
+              id: string;
+              slug: string;
+              name: string;
+              city: string;
+              state: string;
+              heroImageUrl?: string;
+              starRating: number;
+              averageRating?: number;
+              reviewCount?: number;
+              startingPrice: number;
+              bookingModel: string;
+              isFeatured?: boolean;
+            }, index: number) => (
+              <motion.div
+                key={hotel.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <HotelCard
+                  id={hotel.id}
+                  slug={hotel.slug}
+                  name={hotel.name}
+                  location={`${hotel.city}, ${hotel.state}`}
+                  image={hotel.heroImageUrl || "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&q=80"}
+                  rating={hotel.averageRating || hotel.starRating}
+                  reviewCount={hotel.reviewCount || 0}
+                  price={hotel.startingPrice || 0}
+                  hasHourlyBooking={hotel.bookingModel === 'HOURLY' || hotel.bookingModel === 'BOTH'}
+                  isFeatured={hotel.isFeatured}
+                />
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 text-gray-500">
+            <p>No featured hotels available right now.</p>
+            <Button variant="outline" asChild className="mt-4">
+              <Link href="/hotels">Browse All Hotels</Link>
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -101,6 +101,13 @@ export class Hotel {
   @Field(() => Float, { nullable: true })
   commissionRate?: number;
 
+  // Payment gateway accounts
+  @Field({ nullable: true })
+  razorpayAccountId?: string;
+
+  @Field({ nullable: true })
+  stripeAccountId?: string;
+
   // Theme
   @Field(() => GraphQLJSON, { nullable: true })
   themeConfig?: Record<string, unknown>;

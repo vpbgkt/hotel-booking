@@ -134,8 +134,11 @@ export const UPDATE_HOTEL = gql`
       heroImageUrl
       logoUrl
       starRating
+      bookingModel
       checkInTime
       checkOutTime
+      hourlyMinHours
+      hourlyMaxHours
       latitude
       longitude
     }

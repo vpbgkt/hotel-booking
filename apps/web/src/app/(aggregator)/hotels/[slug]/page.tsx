@@ -134,8 +134,56 @@ export default async function HotelPage({ params }: HotelPageProps) {
     notFound();
   }
 
+  // JSON-LD structured data for SEO
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Hotel',
+    name: hotel.name,
+    description: hotel.description,
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: hotel.address,
+      addressLocality: hotel.city,
+      addressRegion: hotel.state,
+      postalCode: hotel.pincode,
+      addressCountry: 'IN',
+    },
+    starRating: {
+      '@type': 'Rating',
+      ratingValue: hotel.starRating,
+    },
+    ...(hotel.averageRating && {
+      aggregateRating: {
+        '@type': 'AggregateRating',
+        ratingValue: hotel.averageRating,
+        reviewCount: hotel.reviewCount || 0,
+        bestRating: 5,
+        worstRating: 1,
+      },
+    }),
+    ...(hotel.heroImageUrl && { image: hotel.heroImageUrl }),
+    ...(hotel.phone && { telephone: hotel.phone }),
+    ...(hotel.email && { email: hotel.email }),
+    ...(hotel.latitude && hotel.longitude && {
+      geo: {
+        '@type': 'GeoCoordinates',
+        latitude: hotel.latitude,
+        longitude: hotel.longitude,
+      },
+    }),
+    ...(hotel.startingPrice && {
+      priceRange: `₹${hotel.startingPrice.toLocaleString('en-IN')}+`,
+    }),
+    checkinTime: hotel.checkInTime || '14:00',
+    checkoutTime: hotel.checkOutTime || '12:00',
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <main className="flex-1">
         {/* Hero Section */}
         <section className="relative h-[40vh] md:h-[50vh] lg:h-[60vh]">

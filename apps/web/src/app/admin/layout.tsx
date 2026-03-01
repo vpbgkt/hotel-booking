@@ -22,6 +22,7 @@ import {
   ChevronLeft,
   Loader2,
   IndianRupee,
+  CreditCard,
   FileText,
   Search,
   MessageCircle,
@@ -74,6 +75,11 @@ const adminLinks = [
     label: 'SEO',
     href: '/admin/seo',
     icon: Search,
+  },
+  {
+    label: 'Payments',
+    href: '/admin/payments',
+    icon: CreditCard,
   },
   {
     label: 'Hotel Settings',

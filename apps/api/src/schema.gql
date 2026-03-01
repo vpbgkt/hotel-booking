@@ -406,6 +406,7 @@ type Hotel {
   name: String!
   phone: String!
   pincode: String!
+  razorpayAccountId: String
   reviewCount: Int
   reviews: [Review!]
   roomTypes: [RoomType!]
@@ -413,6 +414,7 @@ type Hotel {
   starRating: Int!
   startingPrice: Float
   state: String!
+  stripeAccountId: String
   themeConfig: JSON
   updatedAt: DateTime!
   whatsapp: String
@@ -842,6 +844,7 @@ type PlatformHotel {
   phone: String!
   pincode: String!
   primaryDomain: String
+  razorpayAccountId: String
   reviewCount: Int
   reviews: [Review!]
   reviewsCount: Int
@@ -851,6 +854,7 @@ type PlatformHotel {
   starRating: Int!
   startingPrice: Float
   state: String!
+  stripeAccountId: String
   themeConfig: JSON
   updatedAt: DateTime!
   whatsapp: String
@@ -1241,6 +1245,7 @@ input UpdateHotelContentInput {
 
 input UpdateHotelInput {
   address: String
+  bookingModel: BookingModel
   checkInTime: String
   checkOutTime: String
   city: String
@@ -1248,14 +1253,18 @@ input UpdateHotelInput {
   email: String
   heroImageUrl: String
   hotelId: ID!
+  hourlyMaxHours: Int
+  hourlyMinHours: Int
   latitude: Float
   logoUrl: String
   longitude: Float
   name: String
   phone: String
   pincode: String
+  razorpayAccountId: String
   starRating: Int
   state: String
+  stripeAccountId: String
   themeConfig: JSON
   whatsapp: String
 }

@@ -96,6 +96,18 @@ export default async function HotelsPage({ searchParams }: HotelsPageProps) {
   
   return (
     <div className="min-h-screen flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebPage',
+            name: params.city ? `Hotels in ${params.city}` : 'Find Hotels Across India',
+            description: `Browse ${hotels?.total || 0} hotels${params.city ? ` in ${params.city}` : ' across India'}. Compare prices and book directly.`,
+            url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://bluestay.in'}/hotels`,
+          }),
+        }}
+      />
       <main className="flex-1">
         {/* Search Header */}
         <section className="bg-gradient-to-r from-brand-600 to-brand-700 py-8 md:py-12">

@@ -89,7 +89,7 @@ export function PopularDestinations() {
               `}
             >
               <Link
-                href={`/hotels/${destination.slug}`}
+                href={`/hotels?city=${destination.name}`}
                 className="group relative block overflow-hidden rounded-2xl aspect-[4/3] md:aspect-auto md:h-full min-h-[200px]"
               >
                 {/* Background Image */}
