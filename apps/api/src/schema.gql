@@ -51,6 +51,34 @@ type AvailabilityCalendar {
   totalRooms: Int!
 }
 
+"""Blog post author"""
+type BlogAuthor {
+  avatarUrl: String
+  id: ID!
+  name: String!
+}
+
+"""Blog post entity"""
+type BlogPost {
+  author: BlogAuthor
+  authorId: String!
+  category: String
+  content: String!
+  coverImage: String
+  createdAt: DateTime!
+  excerpt: String
+  hotelId: String
+  id: ID!
+  metaDescription: String
+  metaTitle: String
+  publishedAt: DateTime
+  slug: String!
+  status: PostStatus!
+  tags: [String!]!
+  title: String!
+  updatedAt: DateTime!
+}
+
 """Booking entity"""
 type Booking {
   assignedRoomId: String
@@ -288,6 +316,20 @@ type ConfirmPaymentResult {
   bookingNumber: String
   message: String!
   success: Boolean!
+}
+
+"""Create a new blog post"""
+input CreateBlogPostInput {
+  category: String
+  content: String!
+  coverImage: String
+  excerpt: String
+  hotelId: String
+  metaDescription: String
+  metaTitle: String
+  slug: String
+  tags: [String!]
+  title: String!
 }
 
 """Input for creating a daily booking"""
@@ -549,6 +591,16 @@ type LogoutResponse {
   success: Boolean!
 }
 
+"""Input for modifying booking dates"""
+input ModifyBookingInput {
+  bookingId: String!
+  checkInDate: DateTime
+  checkOutDate: DateTime
+  numGuests: Int
+  numRooms: Int
+  specialRequests: String
+}
+
 type MonthlyDataPoint {
   bookings: Int!
   month: String!
@@ -558,6 +610,9 @@ type MonthlyDataPoint {
 type Mutation {
   """Apply pricing suggestions to room inventory"""
   applyPriceSuggestions(input: ApplyPriceSuggestionsInput!): ApplySuggestionsResult!
+
+  """Archive a blog post"""
+  archiveBlogPost(id: ID!): BlogPost!
 
   """Bulk update pricing and availability for a date range"""
   bulkUpdateInventory(input: BulkInventoryUpdateInput!): BulkUpdateResult!
@@ -570,6 +625,9 @@ type Mutation {
 
   """Confirm payment after gateway processing"""
   confirmPayment(gatewayPaymentId: String, gatewaySignature: String, paymentId: ID!): ConfirmPaymentResult!
+
+  """Create a new blog post"""
+  createBlogPost(input: CreateBlogPostInput!): BlogPost!
 
   """Create a daily booking"""
   createDailyBooking(input: CreateDailyBookingInput!): BookingResult!
@@ -586,11 +644,17 @@ type Mutation {
   """Deactivate current user's account"""
   deactivateMyAccount: DeactivateResponse!
 
+  """Delete a blog post permanently"""
+  deleteBlogPost(id: ID!): Boolean!
+
   """Deactivate a room type (soft delete)"""
   deleteRoomType(id: ID!): DeleteResult!
 
   """Delete SEO meta entry"""
   deleteSeoMeta(id: ID!): DeleteResult!
+
+  """Login or register with Google ID token"""
+  googleLogin(idToken: String!): AuthResponse!
 
   """Start payment process for a booking"""
   initiatePayment(bookingId: ID!, method: String! = "card"): InitiatePaymentResult!
@@ -600,6 +664,9 @@ type Mutation {
 
   """Logout and revoke refresh token"""
   logout: LogoutResponse!
+
+  """Modify booking dates and details"""
+  modifyBooking(input: ModifyBookingInput!): Booking!
 
   """Self-serve hotel onboarding - creates hotel + admin account"""
   onboardHotel(input: OnboardHotelInput!): OnboardHotelResult!
@@ -628,6 +695,9 @@ type Mutation {
   """Process refund for a cancelled booking"""
   processRefund(amount: Float, bookingId: ID!): RefundResult!
 
+  """Publish a blog post"""
+  publishBlogPost(id: ID!): BlogPost!
+
   """Refresh access token using refresh token"""
   refreshToken(input: RefreshTokenInput!): AuthResponse!
 
@@ -639,6 +709,9 @@ type Mutation {
 
   """Request OTP for phone login"""
   requestOTP(input: RequestOTPInput!): OTPResponse!
+
+  """Update a blog post"""
+  updateBlogPost(input: UpdateBlogPostInput!): BlogPost!
 
   """Update booking status"""
   updateBookingStatus(input: UpdateBookingStatusInput!): Booking!
@@ -725,6 +798,14 @@ type OnboardHotelResult {
   hotelSlug: String!
   message: String!
   success: Boolean!
+}
+
+"""Paginated blog posts"""
+type PaginatedBlogPosts {
+  page: Float!
+  posts: [BlogPost!]!
+  total: Float!
+  totalPages: Float!
 }
 
 """Paginated bookings result"""
@@ -888,6 +969,13 @@ type PopularCity {
   state: String!
 }
 
+"""Status of a blog post"""
+enum PostStatus {
+  ARCHIVED
+  DRAFT
+  PUBLISHED
+}
+
 input PriceApplyItem {
   date: String!
   price: Float!
@@ -923,6 +1011,12 @@ type Query {
   """Get hotel analytics data"""
   adminAnalytics(hotelId: ID!, months: Int = 6): AdminAnalytics!
 
+  """Get a blog post by ID for admin"""
+  adminBlogPost(id: ID!): BlogPost!
+
+  """Get all blog posts for admin (including drafts)"""
+  adminBlogPosts(hotelId: ID, limit: Int = 20, page: Int = 1, status: String): PaginatedBlogPosts!
+
   """Get dashboard stats for hotel admin"""
   adminDashboardStats(hotelId: ID!): AdminDashboardStats!
 
@@ -940,6 +1034,18 @@ type Query {
 
   """Get availability calendar for a room type"""
   availabilityCalendar(endDate: DateTime!, roomTypeId: ID!, startDate: DateTime!): AvailabilityCalendar!
+
+  """Get blog categories"""
+  blogCategories(hotelId: ID): [String!]!
+
+  """Get a published blog post by slug"""
+  blogPostBySlug(slug: String!): BlogPost!
+
+  """Get published blog posts with pagination"""
+  blogPosts(category: String, hotelId: ID, limit: Int = 10, page: Int = 1, search: String, tag: String): PaginatedBlogPosts!
+
+  """Get all blog tags"""
+  blogTags(hotelId: ID): [String!]!
 
   """Get booking by ID"""
   booking(id: ID!): Booking!
@@ -1224,6 +1330,20 @@ type TopHotelData {
   hotelName: String!
   totalBookings: Int!
   totalRevenue: Float!
+}
+
+"""Update a blog post"""
+input UpdateBlogPostInput {
+  category: String
+  content: String
+  coverImage: String
+  excerpt: String
+  id: String!
+  metaDescription: String
+  metaTitle: String
+  slug: String
+  tags: [String!]
+  title: String
 }
 
 """Input for updating booking status"""

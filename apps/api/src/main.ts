@@ -13,6 +13,11 @@ import compression from 'compression';
 import { AppModule } from './app.module';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { initSentry } from './sentry';
+import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
+
+// Initialize Sentry before anything else
+initSentry();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -72,6 +77,9 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Sentry exception filter (captures 5xx errors)
+  app.useGlobalFilters(new SentryExceptionFilter());
 
   // Graceful shutdown hooks
   app.enableShutdownHooks();

@@ -14,7 +14,8 @@
  */
 
 import { useState, useMemo, useCallback } from 'react';
-import { useQuery, gql } from '@apollo/client';
+import { useQuery } from '@apollo/client/react';
+import { gql } from '@apollo/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import {
@@ -109,7 +110,7 @@ export function AvailabilityCalendar({
   const startDate = format(startOfWeek(startOfMonth(currentMonth)), 'yyyy-MM-dd');
   const endDate = format(endOfWeek(endOfMonth(currentMonth)), 'yyyy-MM-dd');
 
-  const { data, loading } = useQuery(GET_ROOM_AVAILABILITY_CALENDAR, {
+  const { data, loading } = useQuery<any>(GET_ROOM_AVAILABILITY_CALENDAR, {
     variables: { roomTypeId, startDate, endDate },
     fetchPolicy: 'cache-and-network',
   });

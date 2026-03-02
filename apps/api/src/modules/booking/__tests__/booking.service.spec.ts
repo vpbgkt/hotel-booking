@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
 import { NotificationService } from '../../notification/notification.service';
 import { QueueService } from '../../queue/queue.service';
+import { PaymentService } from '../../payment/payment.service';
 import { CreateDailyBookingInput } from '../dto/create-booking.input';
 import { addDays } from 'date-fns';
 
@@ -14,6 +15,7 @@ describe('BookingService', () => {
   let mockRedis: Record<string, any>;
   let mockNotification: Record<string, any>;
   let mockQueue: Record<string, any>;
+  let mockPayment: Record<string, any>;
 
   beforeEach(async () => {
     mockPrisma = {
@@ -43,6 +45,10 @@ describe('BookingService', () => {
       sendEmail: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockPayment = {
+      processRefund: jest.fn().mockResolvedValue({ success: true, refundId: 'rfnd_test', amount: 1000 }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BookingService,
@@ -50,6 +56,7 @@ describe('BookingService', () => {
         { provide: RedisService, useValue: mockRedis },
         { provide: NotificationService, useValue: mockNotification },
         { provide: QueueService, useValue: mockQueue },
+        { provide: PaymentService, useValue: mockPayment },
       ],
     }).compile();
 

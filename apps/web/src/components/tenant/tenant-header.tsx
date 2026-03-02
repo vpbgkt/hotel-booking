@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 const NAV_LINKS = [
   { href: '/hotel', label: 'Home' },
   { href: '/hotel/rooms', label: 'Rooms' },
+  { href: '/hotel/offers', label: 'Offers' },
+  { href: '/blog', label: 'Blog' },
   { href: '/hotel/gallery', label: 'Gallery' },
   { href: '/hotel/reviews', label: 'Reviews' },
   { href: '/hotel/about', label: 'About' },

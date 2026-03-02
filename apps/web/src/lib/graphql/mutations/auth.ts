@@ -48,6 +48,24 @@ export const LOGOUT_MUTATION = gql`
   }
 `;
 
+export const GOOGLE_LOGIN_MUTATION = gql`
+  mutation GoogleLogin($idToken: String!) {
+    googleLogin(idToken: $idToken) {
+      success
+      message
+      accessToken
+      refreshToken
+      user {
+        id
+        email
+        name
+        role
+        avatarUrl
+      }
+    }
+  }
+`;
+
 export const REFRESH_TOKEN_MUTATION = gql`
   mutation RefreshToken($refreshToken: String!) {
     refreshToken(refreshToken: $refreshToken) {

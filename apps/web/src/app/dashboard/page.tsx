@@ -43,12 +43,12 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
 export default function DashboardPage() {
   const { user } = useAuth();
   
-  const { data: bookingsData, loading: bookingsLoading } = useQuery(MY_BOOKINGS, {
+  const { data: bookingsData, loading: bookingsLoading } = useQuery<any>(MY_BOOKINGS, {
     variables: { limit: 50, offset: 0 },
     skip: !user,
   });
 
-  const { data: reviewsData, loading: reviewsLoading } = useQuery(MY_REVIEWS, {
+  const { data: reviewsData, loading: reviewsLoading } = useQuery<any>(MY_REVIEWS, {
     variables: { limit: 10, offset: 0 },
     skip: !user,
   });

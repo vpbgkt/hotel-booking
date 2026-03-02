@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from '@apollo/client';
+import { useMutation } from '@apollo/client/react';
 import { Button } from '@/components/ui/button';
 import { INITIATE_PAYMENT, CONFIRM_PAYMENT } from '@/lib/graphql/mutations/payments';
 import { 
@@ -77,8 +77,8 @@ export function PaymentForm({ bookingId, amount, guestName, guestEmail, guestPho
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   
   // Apollo mutations
-  const [initiatePayment] = useMutation(INITIATE_PAYMENT);
-  const [confirmPayment] = useMutation(CONFIRM_PAYMENT);
+  const [initiatePayment] = useMutation<any>(INITIATE_PAYMENT);
+  const [confirmPayment] = useMutation<any>(CONFIRM_PAYMENT);
   
   // Card details state
   const [cardNumber, setCardNumber] = useState('');

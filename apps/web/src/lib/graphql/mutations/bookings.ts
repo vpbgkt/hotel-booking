@@ -145,3 +145,12 @@ export const GET_MY_BOOKINGS = gql`
   }
   ${BOOKING_FRAGMENT}
 `;
+
+export const MODIFY_BOOKING = gql`
+  mutation ModifyBooking($input: ModifyBookingInput!) {
+    modifyBooking(input: $input) {
+      ...BookingDetails
+    }
+  }
+  ${BOOKING_FRAGMENT}
+`;

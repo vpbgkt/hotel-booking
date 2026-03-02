@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { MapPin, Phone, Mail, MessageCircle, Clock, Send, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useTenant } from '@/lib/tenant/tenant-context';
+import { HotelMap } from '@/components/map/hotel-map';
 
 export default function TenantContactPage() {
   const { hotel, loading, theme } = useTenant();
@@ -109,11 +110,15 @@ export default function TenantContactPage() {
               </ul>
             </div>
 
-            {/* Map placeholder */}
+            {/* Map */}
             <div className="bg-white rounded-xl overflow-hidden shadow-sm border border-gray-100">
-              <div className="h-48 bg-gray-200 flex items-center justify-center">
-                <p className="text-gray-500 text-sm">Map will be displayed here</p>
-              </div>
+              <HotelMap
+                latitude={hotel.latitude}
+                longitude={hotel.longitude}
+                hotelName={hotel.name}
+                address={`${hotel.address}, ${hotel.city}, ${hotel.state}`}
+                height="280px"
+              />
             </div>
           </div>
 

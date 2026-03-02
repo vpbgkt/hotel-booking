@@ -33,7 +33,7 @@ export default function ProfilePage() {
   const [error, setError] = useState('');
   const [showDeactivate, setShowDeactivate] = useState(false);
 
-  const { data: profileData, loading: profileLoading, refetch } = useQuery(USER_PROFILE, {
+  const { data: profileData, loading: profileLoading, refetch } = useQuery<any>(USER_PROFILE, {
     skip: !user,
   });
 

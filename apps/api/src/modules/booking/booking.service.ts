@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { NotificationService } from '../notification/notification.service';
 import { QueueService } from '../queue/queue.service';
+import { PaymentService } from '../payment/payment.service';
 import { 
   CreateDailyBookingInput, 
   CreateHourlyBookingInput,
@@ -16,6 +17,7 @@ import {
   BookingPaginationInput,
   CancelBookingInput,
   UpdateBookingStatusInput,
+  ModifyBookingInput,
 } from './dto/create-booking.input';
 import { BookingType, BookingSource, BookingStatus, PaymentStatus } from './entities/booking.entity';
 import { Prisma } from '@prisma/client';
@@ -31,6 +33,7 @@ export class BookingService {
     private readonly redis: RedisService,
     private readonly notifications: NotificationService,
     private readonly queue: QueueService,
+    private readonly paymentService: PaymentService,
   ) {}
 
   // Lock TTL: 30 seconds to complete booking transaction
@@ -680,6 +683,17 @@ export class BookingService {
 
     this.logger.log(`Cancelled booking ${booking.bookingNumber}`);
 
+    // Auto-refund if payment was captured
+    if (booking.paymentStatus === PaymentStatus.PAID) {
+      try {
+        await this.paymentService.processRefund(bookingId);
+        this.logger.log(`Auto-refund processed for cancelled booking ${booking.bookingNumber}`);
+      } catch (refundError) {
+        this.logger.warn(`Auto-refund failed for booking ${booking.bookingNumber}: ${refundError.message}`);
+        // Don't fail the cancellation if refund fails — admin can process manually
+      }
+    }
+
     // Send cancellation notification (fire and forget)
     this.notifications.notifyBookingCancelled(bookingId).catch(() => {});
 
@@ -842,5 +856,79 @@ export class BookingService {
     return {
       isAvailable: available >= numRooms && !isClosed,
     };
+  }
+
+  /**
+   * Modify booking dates/details (for guest or admin)
+   * Only allowed for PENDING or CONFIRMED bookings.
+   * Recalculates pricing based on new dates.
+   */
+  async modifyBooking(input: ModifyBookingInput) {
+    const { bookingId, checkInDate, checkOutDate, numRooms, numGuests, specialRequests } = input;
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { roomType: true },
+    });
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    if (!['PENDING', 'CONFIRMED'].includes(booking.status)) {
+      throw new BadRequestException('Can only modify pending or confirmed bookings');
+    }
+
+    const updates: any = {};
+
+    // Update dates if provided
+    const newCheckIn = checkInDate || booking.checkInDate;
+    const newCheckOut = checkOutDate || booking.checkOutDate;
+    const newNumRooms = numRooms || booking.numRooms;
+    const newNumGuests = numGuests || booking.numGuests;
+
+    if (checkInDate) updates.checkInDate = checkInDate;
+    if (checkOutDate) updates.checkOutDate = checkOutDate;
+    if (numRooms) updates.numRooms = numRooms;
+    if (numGuests) updates.numGuests = numGuests;
+    if (specialRequests !== undefined) updates.specialRequests = specialRequests;
+
+    // Recalculate pricing if dates or rooms changed
+    if (checkInDate || checkOutDate || numRooms) {
+      if (booking.bookingType === BookingType.DAILY && newCheckOut) {
+        const nights = differenceInDays(newCheckOut, newCheckIn);
+        if (nights <= 0) {
+          throw new BadRequestException('Check-out must be after check-in');
+        }
+        const roomTotal = booking.roomType.basePriceDaily * nights * newNumRooms;
+        const extraGuestTotal = booking.numExtraGuests * (booking.roomType.extraGuestCharge || 0) * nights;
+        const subtotal = roomTotal + extraGuestTotal;
+        const taxes = Math.round(subtotal * this.TAX_RATE * 100) / 100;
+        const totalAmount = subtotal + taxes;
+
+        Object.assign(updates, {
+          roomTotal,
+          extraGuestTotal,
+          taxes,
+          totalAmount,
+          hotelPayout: totalAmount * (1 - 0.1), // Recalc payout
+          commissionAmount: totalAmount * 0.1,
+        });
+      }
+    }
+
+    const updatedBooking = await this.prisma.booking.update({
+      where: { id: bookingId },
+      data: updates,
+      include: {
+        hotel: { select: { id: true, name: true, slug: true, address: true, city: true, phone: true } },
+        roomType: { select: { id: true, name: true, slug: true, images: true } },
+        payments: true,
+      },
+    });
+
+    this.logger.log(`Modified booking ${booking.bookingNumber}`);
+
+    return updatedBooking;
   }
 }

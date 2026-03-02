@@ -85,6 +85,20 @@ export class AuthResolver {
   }
 
   /**
+   * Google OAuth login
+   */
+  @Public()
+  @Mutation(() => AuthResponse, {
+    name: 'googleLogin',
+    description: 'Login or register with Google ID token',
+  })
+  async googleLogin(
+    @Args('idToken') idToken: string,
+  ) {
+    return this.authService.googleLogin(idToken);
+  }
+
+  /**
    * Refresh access token
    */
   @Public()

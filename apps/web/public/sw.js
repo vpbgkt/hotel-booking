@@ -147,3 +147,61 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
 });
+
+// ============================================================================
+// PUSH NOTIFICATIONS
+// ============================================================================
+
+// Handle incoming push notifications
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  let payload;
+  try {
+    payload = event.data.json();
+  } catch {
+    payload = {
+      title: 'BlueStay',
+      body: event.data.text(),
+    };
+  }
+
+  const options = {
+    body: payload.body || '',
+    icon: payload.icon || '/icons/icon-192x192.png',
+    badge: payload.badge || '/icons/badge-72x72.png',
+    tag: payload.tag || 'bluestay-notification',
+    renotify: true,
+    data: payload.data || {},
+    actions: [
+      { action: 'open', title: 'View' },
+      { action: 'dismiss', title: 'Dismiss' },
+    ],
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || 'BlueStay', options)
+  );
+});
+
+// Handle notification click
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+
+  if (event.action === 'dismiss') return;
+
+  // Focus existing tab or open new one
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});

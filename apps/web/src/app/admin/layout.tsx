@@ -29,6 +29,8 @@ import {
   Brain,
   Palette,
   ImageIcon,
+  UserPlus,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +44,11 @@ const adminLinks = [
     label: 'Bookings',
     href: '/admin/bookings',
     icon: CalendarDays,
+  },
+  {
+    label: 'Walk-in',
+    href: '/admin/walk-in',
+    icon: UserPlus,
   },
   {
     label: 'Rooms',
@@ -72,6 +79,11 @@ const adminLinks = [
     label: 'Content',
     href: '/admin/content',
     icon: FileText,
+  },
+  {
+    label: 'Blog',
+    href: '/admin/blog',
+    icon: BookOpen,
   },
   {
     label: 'Gallery',

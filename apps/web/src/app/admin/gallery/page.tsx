@@ -50,7 +50,7 @@ interface MediaItem {
 const CATEGORIES = ['ALL', 'HOTEL', 'ROOM', 'AMENITY', 'GALLERY'] as const;
 
 export default function AdminGalleryPage() {
-  const { token } = useAuth();
+  const { accessToken: token } = useAuth();
   const { hotel } = useTenant();
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);

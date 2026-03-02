@@ -542,3 +542,67 @@ enum MediaCategory {
   AMENITY
   GALLERY
 }
+
+// ============================================================================
+// BLOG
+// ============================================================================
+
+/// Blog post for SEO content and hotel marketing
+model BlogPost {
+  id          String   @id @default(uuid())
+  
+  hotelId     String?  // null = platform-wide post
+  
+  title       String
+  slug        String   @unique
+  excerpt     String?  @db.Text
+  content     String   @db.Text // Markdown/HTML content
+  coverImage  String?
+  
+  authorId    String
+  
+  category    String?   // "travel-tips", "city-guides", "hotel-news"
+  tags        String[]  // ["udaipur", "rajasthan", "luxury"]
+  
+  status      PostStatus @default(DRAFT)
+  publishedAt DateTime?
+  
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([hotelId, status])
+  @@index([slug])
+  @@index([status, publishedAt])
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+// ============================================================================
+// PUSH SUBSCRIPTIONS
+// ============================================================================
+
+/// Push notification subscription for Web Push API
+model PushSubscription {
+  id        String   @id @default(uuid())
+  
+  userId    String?  // null for anonymous subscriptions
+  
+  endpoint  String   @unique
+  p256dh    String   // Public key
+  auth      String   // Auth secret
+  
+  userAgent String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([userId])
+}

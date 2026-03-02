@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { ApolloWrapper } from "@/lib/graphql";
 import { AuthProvider } from "@/lib/auth/auth-context";
 import { ServiceWorkerRegistration } from "@/components/pwa/service-worker-registration";
+import { PushNotificationPrompt } from "@/components/pwa/push-notification-prompt";
 
 /**
  * Inter font configuration
@@ -148,6 +149,7 @@ export default function RootLayout({
 
         {/* PWA service worker registration */}
         <ServiceWorkerRegistration />
+        <PushNotificationPrompt />
       </body>
     </html>
   );

@@ -230,3 +230,41 @@ export class UpdateBookingStatusInput {
   @IsString()
   assignedRoomId?: string;
 }
+
+@InputType({ description: 'Input for modifying booking dates' })
+export class ModifyBookingInput {
+  @Field()
+  @IsString()
+  bookingId: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  checkInDate?: Date;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  checkOutDate?: Date;
+
+  @Field(() => Int, { nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  numRooms?: number;
+
+  @Field(() => Int, { nullable: true })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  numGuests?: number;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  @IsString()
+  specialRequests?: string;
+}

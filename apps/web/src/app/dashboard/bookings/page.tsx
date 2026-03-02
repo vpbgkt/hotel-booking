@@ -10,9 +10,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { MY_BOOKINGS, CANCEL_BOOKING } from '@/lib/graphql/queries/user';
+import { MODIFY_BOOKING } from '@/lib/graphql/mutations/bookings';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { 
   CalendarDays, 
@@ -62,7 +65,13 @@ export default function BookingsPage() {
   const [cancelReason, setCancelReason] = useState('');
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  const { data, loading, error, refetch } = useQuery(MY_BOOKINGS, {
+  // Modify booking state
+  const [showModifyModal, setShowModifyModal] = useState(false);
+  const [modifyingBooking, setModifyingBooking] = useState<any>(null);
+  const [newCheckIn, setNewCheckIn] = useState('');
+  const [newCheckOut, setNewCheckOut] = useState('');
+
+  const { data, loading, error, refetch } = useQuery<any>(MY_BOOKINGS, {
     variables: { limit: 100, offset: 0 },
     skip: !user,
   });
@@ -75,6 +84,34 @@ export default function BookingsPage() {
       refetch();
     },
   });
+
+  const [modifyBooking, { loading: modifying }] = useMutation<any>(MODIFY_BOOKING, {
+    onCompleted: () => {
+      setShowModifyModal(false);
+      setModifyingBooking(null);
+      refetch();
+    },
+  });
+
+  const handleModifyClick = (booking: any) => {
+    setModifyingBooking(booking);
+    setNewCheckIn(new Date(booking.checkInDate).toISOString().split('T')[0]);
+    setNewCheckOut(booking.checkOutDate ? new Date(booking.checkOutDate).toISOString().split('T')[0] : '');
+    setShowModifyModal(true);
+  };
+
+  const handleModifySubmit = async () => {
+    if (!modifyingBooking) return;
+    await modifyBooking({
+      variables: {
+        input: {
+          bookingId: modifyingBooking.id,
+          checkInDate: new Date(newCheckIn).toISOString(),
+          checkOutDate: newCheckOut ? new Date(newCheckOut).toISOString() : undefined,
+        },
+      },
+    });
+  };
 
   const bookings = data?.myBookings || [];
 
@@ -106,6 +143,50 @@ export default function BookingsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Modify Modal */}
+      {showModifyModal && modifyingBooking && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Modify Booking</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Booking #{modifyingBooking.bookingNumber} — {modifyingBooking.roomType?.name}
+            </p>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="modCheckIn">Check-in Date</Label>
+                <Input
+                  id="modCheckIn"
+                  type="date"
+                  value={newCheckIn}
+                  onChange={(e) => setNewCheckIn(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="modCheckOut">Check-out Date</Label>
+                <Input
+                  id="modCheckOut"
+                  type="date"
+                  value={newCheckOut}
+                  onChange={(e) => setNewCheckOut(e.target.value)}
+                  min={newCheckIn}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={() => { setShowModifyModal(false); setModifyingBooking(null); }} disabled={modifying}>
+                Cancel
+              </Button>
+              <Button onClick={handleModifySubmit} disabled={modifying || !newCheckIn || !newCheckOut}>
+                {modifying ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cancel Modal */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -313,6 +394,31 @@ export default function BookingsPage() {
                         </p>
                       </div>
                       <div className="flex gap-2 flex-wrap">
+                        {/* Download Invoice */}
+                        {(booking.paymentStatus === 'PAID' || booking.status === 'CHECKED_OUT') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const token = localStorage.getItem('accessToken');
+                              const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/graphql', '') || 'http://localhost:4000';
+                              window.open(`${apiUrl}/api/invoices/${booking.id}?token=${token}`, '_blank');
+                            }}
+                          >
+                            <Download size={14} className="mr-1" />
+                            Invoice
+                          </Button>
+                        )}
+                        {(booking.status === 'PENDING' || booking.status === 'CONFIRMED') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleModifyClick(booking)}
+                          >
+                            <CalendarDays size={14} className="mr-1" />
+                            Modify
+                          </Button>
+                        )}
                         {(booking.status === 'PENDING' || booking.status === 'CONFIRMED') && (
                           <Button
                             variant="outline"

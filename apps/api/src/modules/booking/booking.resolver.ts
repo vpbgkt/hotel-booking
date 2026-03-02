@@ -9,6 +9,7 @@ import {
   BookingPaginationInput,
   CancelBookingInput,
   UpdateBookingStatusInput,
+  ModifyBookingInput,
 } from './dto/create-booking.input';
 
 // Note: Auth guards will be added when auth module is created
@@ -108,5 +109,18 @@ export class BookingResolver {
     @Args('input') input: UpdateBookingStatusInput,
   ) {
     return this.bookingService.updateBookingStatus(input);
+  }
+
+  /**
+   * Modify booking dates/details (for guest or admin)
+   */
+  @Mutation(() => Booking, { 
+    name: 'modifyBooking', 
+    description: 'Modify booking dates and details' 
+  })
+  async modifyBooking(
+    @Args('input') input: ModifyBookingInput,
+  ) {
+    return this.bookingService.modifyBooking(input);
   }
 }

@@ -33,6 +33,7 @@
   },
   "packageManager": "npm@11.6.2",
   "dependencies": {
+    "@sentry/nextjs": "^10.40.0",
     "@types/compression": "^1.8.1",
     "compression": "^1.8.1",
     "helmet": "^8.1.0"

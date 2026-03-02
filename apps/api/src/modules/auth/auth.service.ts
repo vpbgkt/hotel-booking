@@ -16,6 +16,7 @@ import {
   ChangePasswordInput,
 } from './dto/auth.input';
 import { UserRole } from '../user/entities/user.entity';
+import { GoogleAuthService } from './strategies/google.service';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 
@@ -38,6 +39,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly jwtService: JwtService,
+    private readonly googleAuth: GoogleAuthService,
   ) {}
 
   /**
@@ -228,6 +230,61 @@ export class AuthService {
     return {
       success: true,
       message: 'OTP verified successfully',
+      ...tokens,
+      user: this.sanitizeUser(user),
+    };
+  }
+
+  /**
+   * Google OAuth login/register
+   * Accepts a Google ID token from the frontend, verifies it,
+   * and either logs in the existing user or creates a new account.
+   */
+  async googleLogin(idToken: string) {
+    // Verify Google ID token
+    const googleProfile = await this.googleAuth.verifyIdToken(idToken);
+
+    // Find user by email
+    let user = await this.prisma.user.findUnique({
+      where: { email: googleProfile.email.toLowerCase() },
+    });
+
+    if (user) {
+      // Existing user — update Google metadata if needed
+      if (!user.isActive) {
+        throw new UnauthorizedException('Account is deactivated');
+      }
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          lastLoginAt: new Date(),
+          emailVerified: true,
+          avatarUrl: user.avatarUrl || googleProfile.picture || null,
+        },
+      });
+    } else {
+      // New user — create account
+      user = await this.prisma.user.create({
+        data: {
+          name: googleProfile.name,
+          email: googleProfile.email.toLowerCase(),
+          role: UserRole.GUEST,
+          isActive: true,
+          emailVerified: true,
+          avatarUrl: googleProfile.picture || null,
+        },
+      });
+
+      this.logger.log(`New user created via Google: ${user.email}`);
+    }
+
+    // Generate tokens
+    const tokens = await this.generateTokens(user);
+
+    return {
+      success: true,
+      message: 'Google login successful',
       ...tokens,
       user: this.sanitizeUser(user),
     };

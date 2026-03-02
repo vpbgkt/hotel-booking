@@ -113,9 +113,17 @@ export default function AdminBookingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
-        <p className="text-gray-500 mt-1">Manage all hotel bookings</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
+          <p className="text-gray-500 mt-1">Manage all hotel bookings</p>
+        </div>
+        <Button asChild>
+          <a href="/admin/walk-in">
+            <UserCheck size={16} className="mr-2" />
+            New Walk-in
+          </a>
+        </Button>
       </div>
 
       {/* Filters */}
