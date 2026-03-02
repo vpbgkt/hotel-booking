@@ -8,6 +8,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
@@ -27,6 +28,48 @@ async function bootstrap() {
     logger: process.env.NODE_ENV === 'production' 
       ? ['error', 'warn'] 
       : ['log', 'error', 'warn', 'debug', 'verbose'],
+  });
+
+  // Swagger API Documentation
+  const swaggerConfig = new DocumentBuilder()
+    .setTitle('BlueStay API')
+    .setDescription(
+      'Multi-tenant hotel booking platform API. ' +
+      'Supports aggregator (bluestay.in) and white-label hotel frontends. ' +
+      'Primary API is GraphQL at /graphql. REST endpoints are documented here.',
+    )
+    .setVersion('1.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'JWT',
+    )
+    .addApiKey(
+      { type: 'apiKey', name: 'x-hotel-id', in: 'header' },
+      'HotelId',
+    )
+    .addApiKey(
+      { type: 'apiKey', name: 'x-tenant-type', in: 'header' },
+      'TenantType',
+    )
+    .addTag('Health', 'Health check endpoints')
+    .addTag('Auth', 'Authentication & authorization')
+    .addTag('Hotels', 'Hotel management')
+    .addTag('Bookings', 'Booking operations')
+    .addTag('Payments', 'Payment processing (Razorpay)')
+    .addTag('Uploads', 'File upload management')
+    .addTag('Webhooks', 'Payment webhook handlers')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'none',
+      filter: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+    customSiteTitle: 'BlueStay API Docs',
   });
 
   // Security headers via Helmet
@@ -89,6 +132,7 @@ async function bootstrap() {
   
   console.log(`🚀 BlueStay API running on http://localhost:${port}`);
   console.log(`📊 GraphQL Playground: http://localhost:${port}/graphql`);
+  console.log(`📖 Swagger API Docs: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

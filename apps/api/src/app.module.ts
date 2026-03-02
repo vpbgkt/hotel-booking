@@ -32,6 +32,8 @@ import { SmartPricingModule } from './modules/pricing/smart-pricing.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { BlogModule } from './modules/blog/blog.module';
+import { CommissionModule } from './modules/commission/commission.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 // Health check
@@ -131,6 +133,8 @@ import { HealthController } from './health.controller';
     UploadModule,
     QueueModule,
     BlogModule,
+    CommissionModule,
+    AnalyticsModule,
   ],
   controllers: [HealthController],
   providers: [

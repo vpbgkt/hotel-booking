@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { randomUUID } from 'crypto';
 import { join, extname } from 'path';
 import { existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
+import { createHmac } from 'crypto';
 
 export interface UploadResult {
   url: string;
@@ -72,6 +73,143 @@ class LocalStorageProvider implements StorageProvider {
   }
 }
 
+/**
+ * S3-Compatible Storage Provider
+ * Works with AWS S3, Cloudflare R2, MinIO, DigitalOcean Spaces, etc.
+ * Set UPLOAD_PROVIDER=s3 and configure S3_* environment variables.
+ */
+class S3StorageProvider implements StorageProvider {
+  private bucket: string;
+  private region: string;
+  private endpoint: string;
+  private accessKeyId: string;
+  private secretAccessKey: string;
+  private publicUrl: string;
+  private readonly logger = new Logger('S3StorageProvider');
+
+  constructor() {
+    this.bucket = process.env.S3_BUCKET || 'bluestay-uploads';
+    this.region = process.env.S3_REGION || 'auto';
+    this.endpoint = process.env.S3_ENDPOINT || '';
+    this.accessKeyId = process.env.S3_ACCESS_KEY_ID || '';
+    this.secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || '';
+    this.publicUrl = process.env.S3_PUBLIC_URL || `https://${this.bucket}.s3.${this.region}.amazonaws.com`;
+
+    if (!this.accessKeyId || !this.secretAccessKey) {
+      this.logger.warn('S3 credentials not configured — uploads may fail');
+    }
+  }
+
+  async upload(buffer: Buffer, key: string, mimeType: string): Promise<string> {
+    const url = this.endpoint
+      ? `${this.endpoint}/${this.bucket}/${key}`
+      : `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+
+    const date = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+    const dateStamp = date.slice(0, 8);
+    const contentHash = createHmac('sha256', '').update(buffer).digest('hex');
+
+    // Simplified S3 PUT using fetch with AWS Signature V4 (minimal implementation)
+    const headers: Record<string, string> = {
+      'Content-Type': mimeType,
+      'Content-Length': buffer.length.toString(),
+      'x-amz-date': date,
+      'x-amz-content-sha256': contentHash,
+    };
+
+    // Build canonical request for AWS SigV4
+    const canonicalUri = `/${key}`;
+    const canonicalQuerystring = '';
+    const signedHeaders = Object.keys(headers)
+      .map((h) => h.toLowerCase())
+      .sort()
+      .join(';');
+    const canonicalHeaders = Object.keys(headers)
+      .map((h) => `${h.toLowerCase()}:${headers[h].trim()}`)
+      .sort()
+      .join('\n') + '\n';
+
+    const canonicalRequest = [
+      'PUT',
+      canonicalUri,
+      canonicalQuerystring,
+      canonicalHeaders,
+      signedHeaders,
+      contentHash,
+    ].join('\n');
+
+    const credentialScope = `${dateStamp}/${this.region}/s3/aws4_request`;
+    const stringToSign = [
+      'AWS4-HMAC-SHA256',
+      date,
+      credentialScope,
+      createHmac('sha256', '')
+        .update(canonicalRequest)
+        .digest('hex'),
+    ].join('\n');
+
+    // Derive signing key
+    const kDate = createHmac('sha256', `AWS4${this.secretAccessKey}`)
+      .update(dateStamp)
+      .digest();
+    const kRegion = createHmac('sha256', kDate)
+      .update(this.region)
+      .digest();
+    const kService = createHmac('sha256', kRegion).update('s3').digest();
+    const kSigning = createHmac('sha256', kService)
+      .update('aws4_request')
+      .digest();
+
+    const signature = createHmac('sha256', kSigning)
+      .update(stringToSign)
+      .digest('hex');
+
+    headers[
+      'Authorization'
+    ] = `AWS4-HMAC-SHA256 Credential=${this.accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+    const targetUrl = this.endpoint
+      ? `${this.endpoint}/${this.bucket}/${key}`
+      : `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+
+    const response = await fetch(targetUrl, {
+      method: 'PUT',
+      headers,
+      body: new Uint8Array(buffer),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      this.logger.error(`S3 upload failed: ${response.status} ${text}`);
+      throw new Error(`S3 upload failed: ${response.status}`);
+    }
+
+    this.logger.log(`Uploaded to S3: ${key}`);
+    return this.getUrl(key);
+  }
+
+  async delete(key: string): Promise<void> {
+    const targetUrl = this.endpoint
+      ? `${this.endpoint}/${this.bucket}/${key}`
+      : `https://${this.bucket}.s3.${this.region}.amazonaws.com/${key}`;
+
+    const date = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+    const dateStamp = date.slice(0, 8);
+
+    // Simplified DELETE - for production, use AWS SDK
+    try {
+      await fetch(targetUrl, { method: 'DELETE' });
+      this.logger.log(`Deleted from S3: ${key}`);
+    } catch (err) {
+      this.logger.warn(`Failed to delete from S3: ${key}`);
+    }
+  }
+
+  getUrl(key: string): string {
+    return `${this.publicUrl}/${key}`;
+  }
+}
+
 const ALLOWED_IMAGE_TYPES = [
   'image/jpeg',
   'image/png',
@@ -89,9 +227,13 @@ export class UploadService {
 
   constructor(private readonly prisma: PrismaService) {
     // Select storage provider based on env
-    // Future: if (process.env.UPLOAD_PROVIDER === 's3') this.storage = new S3StorageProvider();
-    this.storage = new LocalStorageProvider();
-    this.logger.log('Upload service initialized with LOCAL storage');
+    if (process.env.UPLOAD_PROVIDER === 's3') {
+      this.storage = new S3StorageProvider();
+      this.logger.log('Upload service initialized with S3/R2 storage');
+    } else {
+      this.storage = new LocalStorageProvider();
+      this.logger.log('Upload service initialized with LOCAL storage');
+    }
   }
 
   /**
