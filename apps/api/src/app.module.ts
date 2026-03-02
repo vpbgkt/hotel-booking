@@ -79,7 +79,7 @@ import { HealthController } from './health.controller';
         }),
         
         // Format errors for client
-        formatError: (error) => {
+        formatError: (error: any) => {
           // In production, hide internal errors
           if (configService.get('NODE_ENV') === 'production') {
             // Log full error server-side

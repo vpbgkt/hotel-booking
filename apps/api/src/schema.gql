@@ -119,6 +119,16 @@ type Booking {
   updatedAt: DateTime!
 }
 
+type BookingAnalytics {
+  avgBookingValue: Float!
+  cancellationRate: Int!
+  sourceBreakdown: [SourceBreakdown!]!
+  statusBreakdown: [StatusBreakdown!]!
+  topRoomTypes: [TopRoomType!]!
+  totalBookings: Int!
+  typeBreakdown: [TypeBreakdown!]!
+}
+
 """Filters for listing bookings"""
 input BookingFiltersInput {
   bookingType: BookingType
@@ -273,6 +283,16 @@ type CityPerformance {
   revenue: Float!
 }
 
+type CommissionBooking {
+  bookingNumber: String!
+  checkInDate: DateTime!
+  checkOutDate: DateTime
+  guestName: String!
+  source: String!
+  status: String!
+  totalAmount: Float!
+}
+
 type CommissionBookingInfo {
   bookingNumber: String
   guestName: String
@@ -294,11 +314,43 @@ type CommissionEntry {
   status: String!
 }
 
-input CommissionsFilter {
-  hotelId: String
-  limit: Int
-  page: Int
-  status: String
+type CommissionHotel {
+  city: String
+  id: ID!
+  name: String!
+  slug: String
+}
+
+type CommissionRecord {
+  booking: CommissionBooking
+  bookingAmount: Float!
+  bookingId: String!
+  commissionAmount: Float!
+  commissionRate: Float!
+  createdAt: DateTime!
+  hotel: CommissionHotel
+  hotelId: String!
+  id: ID!
+  settledAt: DateTime
+  status: String!
+}
+
+type CommissionSummary {
+  disputedCommission: Float
+  lastMonthCommission: Float
+  monthlyCommission: Float!
+  pendingCommission: Float!
+  settledCommission: Float!
+  totalBookings: Int
+  totalCommission: Float!
+}
+
+type CommissionTrend {
+  avgRate: Float!
+  bookingCount: Int!
+  month: String!
+  totalBookingValue: Float!
+  totalCommission: Float!
 }
 
 type CommissionsList {
@@ -395,6 +447,11 @@ type DailyAvailabilityResult {
   unavailableRoomTypes: [RoomTypeAvailability!]!
 }
 
+type DailyRevenue {
+  date: String!
+  revenue: Float!
+}
+
 type DateRange {
   from: String!
   to: String!
@@ -413,6 +470,14 @@ type DeactivateResponse {
 type DeleteResult {
   message: String!
   success: Boolean!
+}
+
+type GuestAnalytics {
+  avgRating: Float!
+  newGuests: Int!
+  returningGuests: Int!
+  topGuests: [TopGuest!]!
+  totalGuests: Int!
 }
 
 """Guest information for booking"""
@@ -653,6 +718,9 @@ type Mutation {
   """Delete SEO meta entry"""
   deleteSeoMeta(id: ID!): DeleteResult!
 
+  """Mark a commission as disputed"""
+  disputeCommission(commissionId: ID!, reason: String!): CommissionRecord!
+
   """Login or register with Google ID token"""
   googleLogin(idToken: String!): AuthResponse!
 
@@ -710,6 +778,12 @@ type Mutation {
   """Request OTP for phone login"""
   requestOTP(input: RequestOTPInput!): OTPResponse!
 
+  """Resolve a disputed commission"""
+  resolveDispute(commissionId: ID!, resolution: String!): CommissionRecord!
+
+  """Settle pending commissions for a hotel"""
+  settleCommissions(commissionIds: [ID!], hotelId: ID!): SettleResult!
+
   """Update a blog post"""
   updateBlogPost(input: UpdateBlogPostInput!): BlogPost!
 
@@ -721,6 +795,9 @@ type Mutation {
 
   """Update hotel details (admin only)"""
   updateHotel(input: UpdateHotelInput!): Hotel!
+
+  """Update commission rate for a hotel"""
+  updateHotelCommissionRate(hotelId: ID!, rate: Float!, type: String = "PERCENTAGE"): CommissionRecord!
 
   """Update hotel content and theme"""
   updateHotelContent(input: UpdateHotelContentInput!): Hotel!
@@ -743,6 +820,22 @@ type OTPResponse {
   expiresAt: DateTime
   message: String!
   success: Boolean!
+}
+
+type OccupancyAnalytics {
+  maxRoomNights: Int!
+  occupancyByRoomType: [OccupancyByRoomType!]!
+  occupancyRate: Int!
+  period: String!
+  totalRoomNights: Int!
+  totalRooms: Int!
+}
+
+type OccupancyByRoomType {
+  bookedRoomNights: Int!
+  occupancy: Int!
+  roomType: String!
+  totalRooms: Int!
 }
 
 type OccupancyForecastDay {
@@ -817,6 +910,14 @@ type PaginatedBookings {
   total: Int!
 }
 
+type PaginatedCommissions {
+  commissions: [CommissionRecord!]!
+  limit: Int!
+  page: Int!
+  total: Int!
+  totalPages: Int!
+}
+
 """Paginated hotels response"""
 type PaginatedHotels {
   hasMore: Boolean!
@@ -875,6 +976,15 @@ type PlatformAnalytics {
   monthlyRevenue: [PlatformMonthlyData!]!
   sourceDistribution: [SourceDistribution!]!
   topHotels: [TopHotelData!]!
+}
+
+type PlatformCommissionSummary {
+  monthlyCommission: Float!
+  pendingCommission: Float!
+  settledCommission: Float!
+  topHotels: [TopHotelCommission!]!
+  totalBookingValue: Float!
+  totalCommission: Float!
 }
 
 type PlatformDashboardStats {
@@ -961,6 +1071,14 @@ type PlatformMonthlyData {
   bookings: Int!
   month: String!
   revenue: Float!
+}
+
+type PlatformRevenueOverview {
+  bookingCount: Int!
+  dailyRevenue: [DailyRevenue!]!
+  topHotels: [TopHotelRevenue!]!
+  totalCommission: Float!
+  totalRevenue: Float!
 }
 
 type PopularCity {
@@ -1050,6 +1168,9 @@ type Query {
   """Get booking by ID"""
   booking(id: ID!): Booking!
 
+  """Get booking analytics for a hotel"""
+  bookingAnalytics(hotelId: ID!, period: String = "30d"): BookingAnalytics!
+
   """Get booking by booking number"""
   bookingByNumber(bookingNumber: String!): Booking!
 
@@ -1065,8 +1186,14 @@ type Query {
   """Check room availability for hourly booking"""
   checkHourlyAvailability(input: CheckHourlyAvailabilityInput!): HourlyAvailabilityResult!
 
+  """Get monthly commission trends"""
+  commissionTrends(hotelId: ID, months: Int = 12): [CommissionTrend!]!
+
   """Get featured hotels"""
   featuredHotels(limit: Float = 6): [Hotel!]!
+
+  """Get guest analytics for a hotel"""
+  guestAnalytics(hotelId: ID!, period: String = "30d"): GuestAnalytics!
 
   """Get hotel by ID"""
   hotel(id: ID!): Hotel!
@@ -1079,6 +1206,12 @@ type Query {
 
   """Get hotel by slug"""
   hotelBySlug(slug: String!): Hotel
+
+  """Get commission summary for a hotel"""
+  hotelCommissionSummary(hotelId: ID!): CommissionSummary!
+
+  """Get commission records for a hotel"""
+  hotelCommissions(endDate: DateTime, hotelId: ID!, limit: Int = 20, page: Int = 1, startDate: DateTime, status: String): PaginatedCommissions!
 
   """Get review stats for a hotel"""
   hotelReviewStats(hotelId: ID!): ReviewStats!
@@ -1101,6 +1234,9 @@ type Query {
   """Get current user's reviews"""
   myReviews(limit: Int = 10, offset: Int = 0): [Review!]!
 
+  """Get occupancy analytics for a hotel"""
+  occupancyAnalytics(hotelId: ID!, period: String = "30d"): OccupancyAnalytics!
+
   """Get occupancy forecast for the next N days"""
   occupancyForecast(input: OccupancyForecastInput!): [OccupancyForecastDay!]!
 
@@ -1110,8 +1246,11 @@ type Query {
   """Get platform-wide analytics"""
   platformAnalytics(months: Int = 6): PlatformAnalytics!
 
-  """List commissions with filters"""
-  platformCommissions(filters: CommissionsFilter): CommissionsList!
+  """Get platform-wide commission summary"""
+  platformCommissionSummary: PlatformCommissionSummary!
+
+  """Get all commissions across the platform"""
+  platformCommissions(endDate: DateTime, hotelId: ID, limit: Int = 20, page: Int = 1, startDate: DateTime, status: String): PaginatedCommissions!
 
   """Get platform-wide dashboard statistics"""
   platformDashboardStats: PlatformDashboardStats!
@@ -1122,11 +1261,17 @@ type Query {
   """Get reviews pending moderation"""
   platformPendingReviews(limit: Int = 20, page: Int = 1): PendingReviewsList!
 
+  """Get platform-wide revenue overview (platform admin only)"""
+  platformRevenueOverview(period: String = "30d"): PlatformRevenueOverview!
+
   """Get popular cities"""
   popularCities(limit: Float = 10): [PopularCity!]!
 
   """Get AI-powered pricing suggestions for a room type"""
   priceSuggestions(input: PriceSuggestionsInput!): PricingAnalysisGQL!
+
+  """Get revenue analytics for a hotel"""
+  revenueAnalytics(hotelId: ID!, period: String = "30d"): RevenueAnalytics!
 
   """Get room type by ID"""
   roomType(id: ID!): RoomType!
@@ -1175,6 +1320,24 @@ input RegisterInput {
 """Request OTP for phone login"""
 input RequestOTPInput {
   phone: String!
+}
+
+type RevenueAnalytics {
+  bookingCount: Int!
+  dailyRevenue: [DailyRevenue!]!
+  hotelPayout: Float!
+  previousBookingCount: Int!
+  previousRevenue: Float!
+  revenueBySource: [RevenueBySource!]!
+  revenueGrowth: Float!
+  totalCommission: Float!
+  totalRevenue: Float!
+}
+
+type RevenueBySource {
+  bookings: Int!
+  revenue: Float!
+  source: String!
 }
 
 type RevenueProjection {
@@ -1303,6 +1466,11 @@ type SeoMetaType {
   updatedAt: DateTime!
 }
 
+type SettleResult {
+  message: String!
+  settledCount: Int!
+}
+
 input SingleDateInventoryInput {
   availableCount: Int
   date: DateTime!
@@ -1318,10 +1486,36 @@ enum SortOrder {
   DESC
 }
 
+type SourceBreakdown {
+  count: Int!
+  revenue: Float!
+  source: String!
+}
+
 type SourceDistribution {
   count: Int!
   revenue: Float!
   source: String!
+}
+
+type StatusBreakdown {
+  count: Int!
+  status: String!
+}
+
+type TopGuest {
+  bookingCount: Int!
+  email: String
+  guestId: String!
+  name: String!
+  totalSpent: Float!
+}
+
+type TopHotelCommission {
+  city: String!
+  hotelId: String!
+  hotelName: String!
+  totalCommission: Float!
 }
 
 type TopHotelData {
@@ -1330,6 +1524,25 @@ type TopHotelData {
   hotelName: String!
   totalBookings: Int!
   totalRevenue: Float!
+}
+
+type TopHotelRevenue {
+  bookings: Int!
+  city: String!
+  hotelId: String!
+  name: String!
+  revenue: Float!
+}
+
+type TopRoomType {
+  bookings: Int!
+  revenue: Float!
+  roomType: String!
+}
+
+type TypeBreakdown {
+  count: Int!
+  type: String!
 }
 
 """Update a blog post"""
