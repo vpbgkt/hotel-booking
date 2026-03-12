@@ -1,11 +1,15 @@
 import { Resolver, Query, Mutation, Args, ID } from '@nestjs/graphql';
 import { ObjectType, Field, Float, Int } from '@nestjs/graphql';
+import { UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { Hotel, HotelDomain } from '../hotel/entities/hotel.entity';
 import { RoomType, RoomInventory } from '../room/entities/room-type.entity';
 import { Booking } from '../booking/entities/booking.entity';
 import { UpdateHotelInput, CreateRoomTypeInput, UpdateRoomTypeInput, BulkInventoryUpdateInput, SingleDateInventoryInput, UpsertSeoMetaInput, UpdateHotelContentInput } from './dto/admin.input';
 import { GraphQLJSON } from 'graphql-scalars';
+import { GqlAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard, Roles } from '../../common/guards/roles.guard';
+import { TenantGuard } from '../../common/guards/tenant.guard';
 
 // Dashboard stats response type
 @ObjectType()
@@ -175,6 +179,8 @@ class AdminAnalytics {
 }
 
 @Resolver()
+@UseGuards(GqlAuthGuard, RolesGuard, TenantGuard)
+@Roles('HOTEL_ADMIN', 'HOTEL_STAFF', 'PLATFORM_ADMIN')
 export class AdminResolver {
   constructor(private readonly adminService: AdminService) {}
 

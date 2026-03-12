@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthResolver } from './auth.resolver';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { ApiKeyStrategy } from './strategies/api-key.strategy';
 import { GoogleAuthService } from './strategies/google.service';
 
 @Module({
@@ -14,7 +15,7 @@ import { GoogleAuthService } from './strategies/google.service';
       signOptions: { expiresIn: '15m' },
     }),
   ],
-  providers: [AuthService, AuthResolver, JwtStrategy, GoogleAuthService],
+  providers: [AuthService, AuthResolver, JwtStrategy, ApiKeyStrategy, GoogleAuthService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

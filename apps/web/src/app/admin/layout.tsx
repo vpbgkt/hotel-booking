@@ -34,6 +34,7 @@ import {
   UserPlus,
   BookOpen,
   ExternalLink,
+  Key,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -107,6 +108,11 @@ const adminLinks = [
     label: 'Branding',
     href: '/admin/branding',
     icon: Palette,
+  },
+  {
+    label: 'API Keys',
+    href: '/admin/api-keys',
+    icon: Key,
   },
   {
     label: 'Hotel Settings',

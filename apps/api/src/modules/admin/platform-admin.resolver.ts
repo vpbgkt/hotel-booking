@@ -1,11 +1,14 @@
 import { Resolver, Query, Mutation, Args, ID, Int } from '@nestjs/graphql';
 import { ObjectType, Field, Float, InputType } from '@nestjs/graphql';
+import { UseGuards } from '@nestjs/common';
 import { IsOptional } from 'class-validator';
 import { PlatformAdminService } from './platform-admin.service';
 import { OnboardHotelInput } from './dto/onboard-hotel.input';
 import { Hotel } from '../hotel/entities/hotel.entity';
 import { Booking } from '../booking/entities/booking.entity';
 import { Review } from '../review/entities/review.entity';
+import { GqlAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard, Roles } from '../../common/guards/roles.guard';
 
 // ============================================
 // Response Types
@@ -391,6 +394,8 @@ class OnboardHotelResult {
 // ============================================
 
 @Resolver()
+@UseGuards(GqlAuthGuard, RolesGuard)
+@Roles('PLATFORM_ADMIN')
 export class PlatformAdminResolver {
   constructor(private readonly platformService: PlatformAdminService) {}
 

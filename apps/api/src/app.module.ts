@@ -35,6 +35,7 @@ import { BlogModule } from './modules/blog/blog.module';
 import { CommissionModule } from './modules/commission/commission.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ExportModule } from './modules/export/export.module';
+import { ApiKeyModule } from './modules/api-key/api-key.module';
 import { AuditLogInterceptor } from './common/interceptors/audit-log.interceptor';
 
 // Health check
@@ -137,6 +138,7 @@ import { HealthController } from './health.controller';
     CommissionModule,
     AnalyticsModule,
     ExportModule,
+    ApiKeyModule,
   ],
   controllers: [HealthController],
   providers: [

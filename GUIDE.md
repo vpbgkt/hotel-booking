@@ -95,8 +95,11 @@ BlueStay is a **multi-tenant hotel booking SaaS platform** that serves three dis
 - **Google OAuth** (social login)
 - **Role-based access**: Guest, HotelAdmin, HotelStaff, PlatformAdmin
 - **Tenant isolation** guards ensuring hotel admins only see their own data
+- **API key authentication** for external frontends and self-hosted sites
+- **Scoped permissions** per API key (read-only, booking, admin)
+- **Rate limiting** per API key with configurable limits
 
-### Hotel Admin Dashboard (15 pages)
+### Hotel Admin Dashboard (16 pages)
 - Dashboard with live revenue, occupancy, and booking stats
 - Room type CRUD with drag-and-drop inventory calendar
 - Booking management (confirm, check-in, check-out, cancel)
@@ -108,6 +111,7 @@ BlueStay is a **multi-tenant hotel booking SaaS platform** that serves three dis
 - Branding & theme configuration
 - Walk-in booking form
 - Payment & commission tracking
+- API key management (generate, revoke, rotate keys for external access)
 
 ### Platform Admin (5 pages)
 - Multi-hotel management (activate, suspend, configure)
@@ -466,6 +470,7 @@ After running `npx prisma db seed`, these users are available:
 | Walk-in Booking | `/admin/walk-in` | HotelAdmin, HotelStaff |
 | Payment Tracking | `/admin/payments` | HotelAdmin |
 | Branding | `/admin/branding` | HotelAdmin |
+| API Keys | `/admin/api-keys` | HotelAdmin |
 | Platform Dashboard | `/platform-admin` | PlatformAdmin |
 | All Hotels | `/platform-admin/hotels` | PlatformAdmin |
 | Commissions | `/platform-admin/commissions` | PlatformAdmin |
@@ -541,6 +546,7 @@ const HOTEL_DOMAIN_MAP: Record<string, string> = {
 8. **Write blog posts** (`/admin/blog`)
 9. **Configure SEO** (`/admin/seo`) — meta tags, OpenGraph, JSON-LD
 10. **Handle walk-ins** (`/admin/walk-in`) — quick front-desk booking
+11. **Manage API keys** (`/admin/api-keys`) — generate keys for external integrations
 
 ### As a Platform Admin
 
@@ -673,6 +679,65 @@ Authorization: Bearer <jwt-token>
 x-tenant-type: aggregator | hotel
 x-hotel-id: <hotel-uuid>
 ```
+
+### API Keys for External Integrations
+
+Hotel owners can generate API keys to power custom frontends, mobile apps, or self-hosted sites.
+
+**Generate an API key** from the admin dashboard at `/admin/api-keys`, or via GraphQL:
+
+```graphql
+mutation {
+  generateApiKey(input: {
+    hotelId: "your-hotel-id"
+    name: "Production Site"
+    permissions: [READ_HOTEL, READ_ROOMS, READ_AVAILABILITY, CREATE_BOOKING]
+    rateLimitPerMinute: 60
+    allowedOrigins: ["https://myhotel.com"]
+  }) {
+    plainTextKey   # Shown only once — store securely
+    apiKey { id keyPrefix permissions }
+  }
+}
+```
+
+**Use the API key** via the `x-api-key` header:
+
+```bash
+curl -X POST https://api.bluestay.in/graphql \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: bsk_your_key_here" \
+  -d '{"query":"{ hotel(id: \"your-hotel-id\") { name roomTypes { name basePriceDaily } } }"}'
+```
+
+**Available permissions:**
+
+| Permission | Description |
+|------------|-------------|
+| `READ_HOTEL` | Hotel info, theme, branding |
+| `READ_ROOMS` | Room types, amenities, images |
+| `READ_AVAILABILITY` | Inventory, pricing per date |
+| `READ_REVIEWS` | Guest reviews and ratings |
+| `READ_BOOKINGS` | List bookings (admin) |
+| `CREATE_BOOKING` | Create new bookings (checkout) |
+| `MANAGE_BOOKINGS` | Update booking status |
+| `MANAGE_ROOMS` | Create/update room types |
+| `MANAGE_INVENTORY` | Update pricing/availability |
+
+**Key management operations:** list keys, revoke, rotate, delete — all available at `/admin/api-keys`.
+
+### Starter Kit (Self-Hosting)
+
+Download a pre-configured Next.js starter project for your hotel:
+
+```
+GET /api/export/:hotelId/starter-kit
+```
+
+The ZIP contains a working Next.js app with:
+- API client pre-configured with your hotel ID and API URL
+- Home page with hotel info and room listing
+- Ready to deploy to Vercel, Netlify, or any Node.js host
 
 ---
 

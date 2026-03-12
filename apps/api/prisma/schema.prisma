@@ -76,6 +76,8 @@ model Hotel {
   media       Media[]
   seoMeta     SEOMeta[]
   commissions Commission[]
+  apiKeys     ApiKey[]
+  subscription Subscription?
   
   @@index([city])
   @@index([isActive, isFeatured])
@@ -663,4 +665,99 @@ model Notification {
   
   @@index([userId, isRead])
   @@index([createdAt])
+}
+
+// ============================================================================
+// API KEYS (for external / self-hosted frontends)
+// ============================================================================
+
+/// API key for hotel owners or developers to access hotel data externally
+model ApiKey {
+  id          String   @id @default(uuid())
+  hotelId     String
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  name        String   // e.g. "Production Site", "Mobile App"
+  keyHash     String   @unique // SHA-256 hash of the actual key (never store plaintext)
+  keyPrefix   String   // First 8 chars for identification (e.g. "bsk_a1b2...")
+  
+  permissions ApiKeyPermission[] @default([READ_HOTEL, READ_ROOMS, READ_AVAILABILITY, CREATE_BOOKING])
+  
+  // Rate limiting
+  rateLimitPerMinute Int @default(60)
+  
+  // Allowed origins (CORS). Empty = allow all origins
+  allowedOrigins String[] // e.g. ["https://myhotel.com", "http://localhost:3000"]
+  
+  // Usage tracking
+  lastUsedAt  DateTime?
+  requestCount Int      @default(0)
+  
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime? // null = never expires
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([keyHash])
+  @@index([hotelId])
+}
+
+enum ApiKeyPermission {
+  READ_HOTEL        // Hotel info, theme, branding
+  READ_ROOMS        // Room types, amenities, images
+  READ_AVAILABILITY // Inventory, pricing per date
+  READ_REVIEWS      // Guest reviews
+  READ_BOOKINGS     // List bookings (admin)
+  CREATE_BOOKING    // Create new bookings (guest checkout)
+  MANAGE_BOOKINGS   // Update booking status (admin)
+  MANAGE_ROOMS      // CRUD room types (admin)
+  MANAGE_INVENTORY  // Update pricing/availability (admin)
+}
+
+// ============================================================================
+// SUBSCRIPTION & BILLING
+// ============================================================================
+
+/// Hotel subscription for self-hosted / custom domain plans
+model Subscription {
+  id          String   @id @default(uuid())
+  hotelId     String   @unique
+  hotel       Hotel    @relation(fields: [hotelId], references: [id], onDelete: Cascade)
+  
+  plan        SubscriptionPlan @default(FREE)
+  status      SubscriptionStatus @default(ACTIVE)
+  
+  // Billing period
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime
+  
+  // Payment info
+  amount      Float    @default(0) // Annual amount in INR
+  currency    String   @default("INR")
+  
+  // Features unlocked
+  customDomainEnabled  Boolean @default(false)
+  apiAccessEnabled     Boolean @default(false)
+  selfHostingEnabled   Boolean @default(false)
+  maxApiKeys           Int     @default(0)
+  
+  cancelledAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum SubscriptionPlan {
+  FREE        // Hosted on bluestay.in, commission-based
+  STARTER     // Custom domain, basic templates, 1 API key
+  PROFESSIONAL // API access, self-hosting, 5 API keys
+  ENTERPRISE  // Unlimited API keys, priority support
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
 }

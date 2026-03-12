@@ -135,15 +135,32 @@ async function bootstrap() {
           await redis.set(cacheKey, allowed, 300); // Cache for 5 min
         }
 
-        return callback(null, allowed === 'true');
+        if (allowed === 'true') return callback(null, true);
       } catch {
         // If lookup fails, deny by default in production, allow in dev
-        return callback(null, process.env.NODE_ENV !== 'production');
+        if (process.env.NODE_ENV !== 'production') return callback(null, true);
       }
+
+      // Check API key allowed origins (for self-hosted / external frontends)
+      try {
+        const prisma = app.get('PrismaService');
+        const apiKeyOrigin = await prisma.apiKey.findFirst({
+          where: {
+            allowedOrigins: { has: origin },
+            isActive: true,
+          },
+          select: { id: true },
+        });
+        if (apiKeyOrigin) return callback(null, true);
+      } catch {
+        // Non-critical: API key origin check failure
+      }
+
+      return callback(null, false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-hotel-id', 'x-tenant-type'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-hotel-id', 'x-tenant-type', 'x-api-key'],
   });
 
   // Global validation pipe for DTOs

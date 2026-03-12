@@ -204,4 +204,239 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
   </div>`;
     return this.pageWrapper(hotel, 'Reviews', content);
   }
+
+  // =============================================================
+  // Starter Kit: Next.js project template with API key integration
+  // =============================================================
+
+  async buildStarterKit(hotelId: string, apiUrl: string): Promise<{ stream: PassThrough; filename: string }> {
+    const hotel = await this.prisma.hotel.findUnique({
+      where: { id: hotelId },
+      select: { id: true, name: true, slug: true, city: true, state: true },
+    });
+
+    if (!hotel) throw new NotFoundException('Hotel not found');
+
+    const passthrough = new PassThrough();
+    const archive = archiver.default('zip', { zlib: { level: 9 } });
+
+    archive.on('error', (err) => {
+      this.logger.error(`Starter kit archive error for hotel ${hotelId}`, err);
+      passthrough.destroy(err);
+    });
+
+    archive.pipe(passthrough);
+
+    const slug = hotel.slug;
+
+    // package.json
+    archive.append(JSON.stringify({
+      name: `${slug}-website`,
+      version: '1.0.0',
+      private: true,
+      scripts: {
+        dev: 'next dev',
+        build: 'next build',
+        start: 'next start',
+      },
+      dependencies: {
+        next: '^14.2.0',
+        react: '^18.2.0',
+        'react-dom': '^18.2.0',
+      },
+      devDependencies: {
+        typescript: '^5.3.0',
+        '@types/react': '^18.2.0',
+        '@types/node': '^20.11.0',
+      },
+    }, null, 2), { name: `${slug}-starter/package.json` });
+
+    // .env.local
+    archive.append(
+      `# BlueStay API Configuration\n` +
+      `# Get your API key from the admin dashboard: /admin/api-keys\n` +
+      `NEXT_PUBLIC_API_URL=${apiUrl}\n` +
+      `NEXT_PUBLIC_HOTEL_ID=${hotelId}\n` +
+      `API_KEY=bsk_your_api_key_here\n`,
+      { name: `${slug}-starter/.env.local` },
+    );
+
+    // .env.example
+    archive.append(
+      `NEXT_PUBLIC_API_URL=\n` +
+      `NEXT_PUBLIC_HOTEL_ID=\n` +
+      `API_KEY=\n`,
+      { name: `${slug}-starter/.env.example` },
+    );
+
+    // tsconfig.json
+    archive.append(JSON.stringify({
+      compilerOptions: {
+        target: 'es5',
+        lib: ['dom', 'dom.iterable', 'esnext'],
+        allowJs: true,
+        skipLibCheck: true,
+        strict: true,
+        noEmit: true,
+        esModuleInterop: true,
+        module: 'esnext',
+        moduleResolution: 'bundler',
+        resolveJsonModule: true,
+        isolatedModules: true,
+        jsx: 'preserve',
+        incremental: true,
+        paths: { '@/*': ['./src/*'] },
+      },
+      include: ['next-env.d.ts', '**/*.ts', '**/*.tsx'],
+      exclude: ['node_modules'],
+    }, null, 2), { name: `${slug}-starter/tsconfig.json` });
+
+    // next.config.js
+    archive.append(
+      `/** @type {import('next').NextConfig} */\n` +
+      `const nextConfig = {};\n` +
+      `module.exports = nextConfig;\n`,
+      { name: `${slug}-starter/next.config.js` },
+    );
+
+    // lib/api.ts — API client
+    archive.append(
+      `/**\n` +
+      ` * BlueStay API Client\n` +
+      ` * Fetches hotel data via the BlueStay GraphQL API using your API key.\n` +
+      ` */\n\n` +
+      `const API_URL = process.env.NEXT_PUBLIC_API_URL + '/graphql';\n` +
+      `const API_KEY = process.env.API_KEY!;\n` +
+      `const HOTEL_ID = process.env.NEXT_PUBLIC_HOTEL_ID!;\n\n` +
+      `export async function query<T = any>(graphql: string, variables?: Record<string, any>): Promise<T> {\n` +
+      `  const res = await fetch(API_URL, {\n` +
+      `    method: 'POST',\n` +
+      `    headers: {\n` +
+      `      'Content-Type': 'application/json',\n` +
+      `      'x-api-key': API_KEY,\n` +
+      `    },\n` +
+      `    body: JSON.stringify({ query: graphql, variables }),\n` +
+      `    next: { revalidate: 300 }, // Cache for 5 min\n` +
+      `  });\n\n` +
+      `  const json = await res.json();\n` +
+      `  if (json.errors) throw new Error(json.errors[0].message);\n` +
+      `  return json.data;\n` +
+      `}\n\n` +
+      `export { HOTEL_ID };\n`,
+      { name: `${slug}-starter/src/lib/api.ts` },
+    );
+
+    // app/layout.tsx
+    archive.append(
+      `import './globals.css';\n\n` +
+      `export const metadata = {\n` +
+      `  title: '${hotel.name}',\n` +
+      `  description: 'Welcome to ${hotel.name} — ${hotel.city}, ${hotel.state}',\n` +
+      `};\n\n` +
+      `export default function RootLayout({ children }: { children: React.ReactNode }) {\n` +
+      `  return (\n` +
+      `    <html lang="en">\n` +
+      `      <body>{children}</body>\n` +
+      `    </html>\n` +
+      `  );\n` +
+      `}\n`,
+      { name: `${slug}-starter/src/app/layout.tsx` },
+    );
+
+    // app/globals.css
+    archive.append(
+      `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n` +
+      `body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }\n`,
+      { name: `${slug}-starter/src/app/globals.css` },
+    );
+
+    // app/page.tsx — home page
+    archive.append(
+      `import { query, HOTEL_ID } from '@/lib/api';\n\n` +
+      `async function getHotel() {\n` +
+      `  const data = await query(\`\n` +
+      `    query GetHotel($id: ID!) {\n` +
+      `      hotel(id: $id) {\n` +
+      `        id name description address city state phone email\n` +
+      `        starRating heroImageUrl logoUrl\n` +
+      `        roomTypes { id name description basePriceDaily maxGuests images amenities }\n` +
+      `      }\n` +
+      `    }\n` +
+      `  \`, { id: HOTEL_ID });\n` +
+      `  return data.hotel;\n` +
+      `}\n\n` +
+      `export default async function HomePage() {\n` +
+      `  const hotel = await getHotel();\n\n` +
+      `  return (\n` +
+      `    <main className="min-h-screen">\n` +
+      `      {/* Hero */}\n` +
+      `      <section className="bg-gray-900 text-white py-20 px-4 text-center">\n` +
+      `        <h1 className="text-4xl font-bold">{hotel.name}</h1>\n` +
+      `        <p className="text-lg text-gray-300 mt-2">{hotel.city}, {hotel.state}</p>\n` +
+      `        <p className="text-gray-400 mt-4 max-w-2xl mx-auto">{hotel.description}</p>\n` +
+      `      </section>\n\n` +
+      `      {/* Rooms */}\n` +
+      `      <section className="py-16 px-4 max-w-6xl mx-auto">\n` +
+      `        <h2 className="text-3xl font-bold mb-8">Our Rooms</h2>\n` +
+      `        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">\n` +
+      `          {hotel.roomTypes?.map((room: any) => (\n` +
+      `            <div key={room.id} className="border rounded-xl overflow-hidden shadow-sm">\n` +
+      `              {room.images?.[0] && (\n` +
+      `                <img src={room.images[0]} alt={room.name} className="w-full h-48 object-cover" />\n` +
+      `              )}\n` +
+      `              <div className="p-4">\n` +
+      `                <h3 className="text-xl font-semibold">{room.name}</h3>\n` +
+      `                <p className="text-gray-500 text-sm mt-1">{room.description}</p>\n` +
+      `                <p className="text-2xl font-bold text-blue-600 mt-3">\n` +
+      `                  ₹{room.basePriceDaily.toLocaleString('en-IN')}\n` +
+      `                  <span className="text-sm font-normal text-gray-400"> / night</span>\n` +
+      `                </p>\n` +
+      `              </div>\n` +
+      `            </div>\n` +
+      `          ))}\n` +
+      `        </div>\n` +
+      `      </section>\n\n` +
+      `      {/* Footer */}\n` +
+      `      <footer className="bg-gray-100 py-8 px-4 text-center text-gray-500 text-sm">\n` +
+      `        <p>© ${new Date().getFullYear()} {hotel.name}. All rights reserved.</p>\n` +
+      `        <p className="mt-1">{hotel.phone} · {hotel.email}</p>\n` +
+      `      </footer>\n` +
+      `    </main>\n` +
+      `  );\n` +
+      `}\n`,
+      { name: `${slug}-starter/src/app/page.tsx` },
+    );
+
+    // README.md
+    archive.append(
+      `# ${hotel.name} — Website\n\n` +
+      `A Next.js website powered by BlueStay API.\n\n` +
+      `## Quick Start\n\n` +
+      `1. Install dependencies:\n` +
+      `   \`\`\`bash\n   npm install\n   \`\`\`\n\n` +
+      `2. Get your API key from the admin dashboard at \`/admin/api-keys\`.\n\n` +
+      `3. Update \`.env.local\` with your API key:\n` +
+      `   \`\`\`\n   API_KEY=bsk_your_real_key\n   \`\`\`\n\n` +
+      `4. Start the dev server:\n` +
+      `   \`\`\`bash\n   npm run dev\n   \`\`\`\n\n` +
+      `## API Reference\n\n` +
+      `Your API key supports these queries:\n\n` +
+      `| Query | Description |\n` +
+      `|-------|-------------|\n` +
+      `| \`hotel(id: ID!)\` | Hotel details, theme, branding |\n` +
+      `| \`roomTypes(hotelId: ID!)\` | Room types, pricing, amenities |\n` +
+      `| \`checkAvailability(...)\` | Check room availability |\n` +
+      `| \`hotelReviews(hotelId: ID!)\` | Guest reviews |\n` +
+      `| \`createDailyBooking(input)\` | Create a booking |\n\n` +
+      `## Deployment\n\n` +
+      `Deploy to Vercel, Netlify, or any Node.js host:\n\n` +
+      `\`\`\`bash\nnpm run build\nnpm start\n\`\`\`\n\n` +
+      `Set the same environment variables on your hosting platform.\n`,
+      { name: `${slug}-starter/README.md` },
+    );
+
+    await archive.finalize();
+
+    return { stream: passthrough, filename: `${slug}-starter-kit.zip` };
+  }
 }
