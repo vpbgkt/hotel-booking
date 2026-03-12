@@ -9,6 +9,7 @@ import { Booking } from '../booking/entities/booking.entity';
 import { Review } from '../review/entities/review.entity';
 import { GqlAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../../common/guards/roles.guard';
+import { ApiKeyPermission } from '../api-key/entities/api-key.entity';
 
 // ============================================
 // Response Types
@@ -368,6 +369,105 @@ class CommissionsFilter {
 }
 
 // ============================================
+// API Key Types (Platform-wide)
+// ============================================
+
+@ObjectType()
+class PlatformApiKeyHotelInfo {
+  @Field()
+  name: string;
+
+  @Field()
+  slug: string;
+}
+
+@ObjectType()
+class PlatformApiKeyEntry {
+  @Field(() => ID)
+  id: string;
+
+  @Field()
+  hotelId: string;
+
+  @Field()
+  name: string;
+
+  @Field()
+  keyPrefix: string;
+
+  @Field(() => [ApiKeyPermission])
+  permissions: ApiKeyPermission[];
+
+  @Field(() => Int)
+  rateLimitPerMinute: number;
+
+  @Field(() => [String])
+  allowedOrigins: string[];
+
+  @Field({ nullable: true })
+  lastUsedAt: Date | null;
+
+  @Field(() => Int)
+  requestCount: number;
+
+  @Field()
+  isActive: boolean;
+
+  @Field({ nullable: true })
+  expiresAt: Date | null;
+
+  @Field()
+  createdAt: Date;
+
+  @Field()
+  updatedAt: Date;
+
+  @Field(() => PlatformApiKeyHotelInfo)
+  hotel: PlatformApiKeyHotelInfo;
+}
+
+@ObjectType()
+class PlatformApiKeysList {
+  @Field(() => [PlatformApiKeyEntry])
+  keys: PlatformApiKeyEntry[];
+
+  @Field(() => Int)
+  total: number;
+
+  @Field(() => Int)
+  page: number;
+
+  @Field(() => Int)
+  limit: number;
+
+  @Field()
+  hasMore: boolean;
+}
+
+@InputType()
+class PlatformApiKeysFilter {
+  @Field({ nullable: true })
+  @IsOptional()
+  hotelId?: string;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  isActive?: boolean;
+
+  @Field({ nullable: true })
+  @IsOptional()
+  search?: string;
+
+  @Field(() => Int, { nullable: true })
+  @IsOptional()
+  page?: number;
+
+  @Field(() => Int, { nullable: true })
+  @IsOptional()
+  limit?: number;
+}
+
+// ============================================
 // Onboarding Result Type
 // ============================================
 
@@ -536,5 +636,39 @@ export class PlatformAdminResolver {
   })
   async onboardHotel(@Args('input') input: OnboardHotelInput) {
     return this.platformService.onboardHotel(input);
+  }
+
+  // ============================================
+  // API Key Management
+  // ============================================
+
+  @Query(() => PlatformApiKeysList, {
+    name: 'platformApiKeys',
+    description: 'List all API keys across all hotels',
+  })
+  async getApiKeys(
+    @Args('filters', { type: () => PlatformApiKeysFilter, nullable: true })
+    filters?: PlatformApiKeysFilter,
+  ) {
+    return this.platformService.getAllApiKeys(filters || undefined);
+  }
+
+  @Mutation(() => PlatformApiKeyEntry, {
+    name: 'platformToggleApiKey',
+    description: 'Enable or disable an API key',
+  })
+  async toggleApiKey(
+    @Args('keyId', { type: () => ID }) keyId: string,
+    @Args('isActive') isActive: boolean,
+  ) {
+    return this.platformService.toggleApiKey(keyId, isActive);
+  }
+
+  @Mutation(() => PlatformDeleteResult, {
+    name: 'platformDeleteApiKey',
+    description: 'Permanently delete an API key',
+  })
+  async deleteApiKey(@Args('keyId', { type: () => ID }) keyId: string) {
+    return this.platformService.deleteApiKey(keyId);
   }
 }

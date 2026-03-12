@@ -15,6 +15,7 @@ import {
   IndianRupee,
   BarChart3,
   Shield,
+  Key,
   Menu,
   X,
   LogOut,
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/platform-admin/commissions', label: 'Commissions', icon: IndianRupee },
   { href: '/platform-admin/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/platform-admin/moderation', label: 'Moderation', icon: Shield },
+  { href: '/platform-admin/api-keys', label: 'API Keys', icon: Key },
 ];
 
 export default function PlatformAdminLayout({

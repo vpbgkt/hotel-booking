@@ -548,4 +548,108 @@ export class PlatformAdminService {
       adminEmail: result.adminUser.email,
     };
   }
+
+  // ============================================
+  // API Key Management (Platform-wide)
+  // ============================================
+
+  async getAllApiKeys(filters?: {
+    hotelId?: string;
+    isActive?: boolean;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters?.hotelId) where.hotelId = filters.hotelId;
+    if (filters?.isActive !== undefined) where.isActive = filters.isActive;
+    if (filters?.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { keyPrefix: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [keys, total] = await Promise.all([
+      this.prisma.apiKey.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          hotelId: true,
+          name: true,
+          keyPrefix: true,
+          permissions: true,
+          rateLimitPerMinute: true,
+          allowedOrigins: true,
+          lastUsedAt: true,
+          requestCount: true,
+          isActive: true,
+          expiresAt: true,
+          createdAt: true,
+          updatedAt: true,
+          hotel: { select: { name: true, slug: true } },
+        },
+      }),
+      this.prisma.apiKey.count({ where }),
+    ]);
+
+    return {
+      keys,
+      total,
+      page,
+      limit,
+      hasMore: skip + keys.length < total,
+    };
+  }
+
+  async toggleApiKey(keyId: string, isActive: boolean) {
+    const key = await this.prisma.apiKey.findUnique({ where: { id: keyId } });
+    if (!key) throw new NotFoundException('API key not found');
+
+    const updated = await this.prisma.apiKey.update({
+      where: { id: keyId },
+      data: { isActive },
+      select: {
+        id: true,
+        hotelId: true,
+        name: true,
+        keyPrefix: true,
+        permissions: true,
+        rateLimitPerMinute: true,
+        allowedOrigins: true,
+        lastUsedAt: true,
+        requestCount: true,
+        isActive: true,
+        expiresAt: true,
+        createdAt: true,
+        updatedAt: true,
+        hotel: { select: { name: true, slug: true } },
+      },
+    });
+
+    // Invalidate cache
+    const cacheKey = `apikey:${key.keyHash}`;
+    await this.redis.del(cacheKey);
+
+    return updated;
+  }
+
+  async deleteApiKey(keyId: string) {
+    const key = await this.prisma.apiKey.findUnique({ where: { id: keyId } });
+    if (!key) throw new NotFoundException('API key not found');
+
+    await this.prisma.apiKey.delete({ where: { id: keyId } });
+
+    const cacheKey = `apikey:${key.keyHash}`;
+    await this.redis.del(cacheKey);
+
+    return { success: true, message: 'API key deleted' };
+  }
 }

@@ -250,3 +250,59 @@ export const ONBOARD_HOTEL = gql`
     }
   }
 `;
+
+// ============================================
+// API Key Management
+// ============================================
+
+export const PLATFORM_API_KEYS = gql`
+  query PlatformApiKeys($filters: PlatformApiKeysFilter) {
+    platformApiKeys(filters: $filters) {
+      keys {
+        id
+        hotelId
+        name
+        keyPrefix
+        permissions
+        rateLimitPerMinute
+        allowedOrigins
+        lastUsedAt
+        requestCount
+        isActive
+        expiresAt
+        createdAt
+        updatedAt
+        hotel {
+          name
+          slug
+        }
+      }
+      total
+      page
+      limit
+      hasMore
+    }
+  }
+`;
+
+export const PLATFORM_TOGGLE_API_KEY = gql`
+  mutation PlatformToggleApiKey($keyId: ID!, $isActive: Boolean!) {
+    platformToggleApiKey(keyId: $keyId, isActive: $isActive) {
+      id
+      isActive
+      hotel {
+        name
+        slug
+      }
+    }
+  }
+`;
+
+export const PLATFORM_DELETE_API_KEY = gql`
+  mutation PlatformDeleteApiKey($keyId: ID!) {
+    platformDeleteApiKey(keyId: $keyId) {
+      success
+      message
+    }
+  }
+`;
