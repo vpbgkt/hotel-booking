@@ -5,7 +5,7 @@
  * Generate, view, revoke, and manage API keys for external integrations
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
@@ -34,6 +34,8 @@ import {
   Globe,
   XCircle,
 } from 'lucide-react';
+
+const AGGREGATOR_HOSTS = new Set(['bluestay.in', 'www.bluestay.in']);
 
 const ALL_PERMISSIONS = [
   { value: 'READ_HOTEL', label: 'Read Hotel', description: 'Hotel info, theme, branding' },
@@ -68,6 +70,10 @@ interface ApiKey {
 export default function ApiKeysPage() {
   const { user } = useAuth();
   const hotelId = user?.hotelId;
+  const [hostname, setHostname] = useState('');
+
+  const isAggregatorHost = hostname ? AGGREGATOR_HOSTS.has(hostname) : false;
+  const canCreateOrRotateKey = !isAggregatorHost;
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newKeyResult, setNewKeyResult] = useState<{ key: string; prefix: string } | null>(null);
@@ -86,6 +92,12 @@ export default function ApiKeysPage() {
 
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setHostname(window.location.hostname);
+    }
+  }, []);
+
   const { data, loading, error, refetch } = useQuery<{ myApiKeys: ApiKey[] }>(GET_MY_API_KEYS, {
     variables: { hotelId },
     skip: !hotelId,
@@ -99,6 +111,14 @@ export default function ApiKeysPage() {
   const apiKeys: ApiKey[] = data?.myApiKeys || [];
 
   const handleCreateKey = async () => {
+    if (!canCreateOrRotateKey) {
+      setStatusMessage({
+        type: 'error',
+        text: 'API key creation is managed by BlueStay team. Contact support for custom website access.',
+      });
+      setTimeout(() => setStatusMessage(null), 5000);
+      return;
+    }
     if (!keyName.trim() || !hotelId) return;
 
     try {
@@ -159,6 +179,14 @@ export default function ApiKeysPage() {
   };
 
   const handleRotateKey = async (keyId: string) => {
+    if (!canCreateOrRotateKey) {
+      setStatusMessage({
+        type: 'error',
+        text: 'API key rotation is managed by BlueStay team. Contact support for custom website access.',
+      });
+      setTimeout(() => setStatusMessage(null), 5000);
+      return;
+    }
     try {
       const result = await rotateApiKey({ variables: { keyId } });
       const { plainTextKey, apiKey } = result.data!.rotateApiKey;
@@ -208,12 +236,22 @@ export default function ApiKeysPage() {
         <Button
           onClick={() => { setShowCreateForm(true); setNewKeyResult(null); setRotatedKeyResult(null); }}
           className="bg-blue-600 hover:bg-blue-700 text-white"
-          disabled={showCreateForm}
+          disabled={showCreateForm || !canCreateOrRotateKey}
         >
           <Plus className="w-4 h-4 mr-2" />
           New API Key
         </Button>
       </div>
+
+      {!canCreateOrRotateKey && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="pt-6">
+            <p className="text-sm text-amber-900">
+              API key creation is disabled on aggregator admin. For custom website/API access, contact BlueStay team.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Status message */}
       {statusMessage && (
@@ -497,14 +535,16 @@ curl -H "x-api-key: bsk_your_key_here" \\
                   {/* Actions */}
                   {apiKey.isActive && (
                     <div className="flex items-center gap-1 ml-4">
-                      <button
-                        onClick={() => setConfirmRotate(apiKey.id)}
-                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                        title="Rotate key"
-                        disabled={rotating}
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
+                      {canCreateOrRotateKey && (
+                        <button
+                          onClick={() => setConfirmRotate(apiKey.id)}
+                          className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Rotate key"
+                          disabled={rotating}
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleRevokeKey(apiKey.id)}
                         className="p-2 text-gray-400 hover:text-yellow-600 transition-colors"

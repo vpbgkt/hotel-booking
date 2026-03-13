@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const AGGREGATOR_HOSTS = new Set(['bluestay.in', 'www.bluestay.in']);
+
 const adminLinks = [
   {
     label: 'Dashboard',
@@ -140,6 +142,13 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hostname, setHostname] = useState('');
+
+  const isAggregatorHost = hostname ? AGGREGATOR_HOSTS.has(hostname) : false;
+  const isHotelUser = user?.role === 'HOTEL_ADMIN' || user?.role === 'HOTEL_STAFF';
+  const visibleLinks = isAggregatorHost && isHotelUser
+    ? adminLinks.filter((link) => link.href === '/admin/rooms')
+    : adminLinks;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: hotelData } = useQuery<any>(GET_MY_HOTEL, {
@@ -150,13 +159,24 @@ export default function AdminLayout({
   const hotelSlug = hotelData?.hotel?.slug;
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setHostname(window.location.hostname);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/auth/login?redirect=/admin');
     }
-    if (!isLoading && isAuthenticated && user?.role !== 'HOTEL_ADMIN' && user?.role !== 'PLATFORM_ADMIN') {
+    if (!isLoading && isAuthenticated && user?.role !== 'HOTEL_ADMIN' && user?.role !== 'HOTEL_STAFF') {
       router.push('/dashboard');
     }
-  }, [isLoading, isAuthenticated, user, router]);
+    if (!isLoading && isAuthenticated && isAggregatorHost && isHotelUser) {
+      if (pathname !== '/admin/rooms') {
+        router.push('/admin/rooms');
+      }
+    }
+  }, [isLoading, isAuthenticated, user, router, pathname, isAggregatorHost, isHotelUser]);
 
   if (isLoading) {
     return (
@@ -166,7 +186,7 @@ export default function AdminLayout({
     );
   }
 
-  if (!isAuthenticated || (user?.role !== 'HOTEL_ADMIN' && user?.role !== 'PLATFORM_ADMIN')) {
+  if (!isAuthenticated || (user?.role !== 'HOTEL_ADMIN' && user?.role !== 'HOTEL_STAFF')) {
     return null;
   }
 
@@ -206,7 +226,7 @@ export default function AdminLayout({
 
         {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-          {adminLinks.map((link) => {
+          {visibleLinks.map((link) => {
             const Icon = link.icon;
             const isActive =
               link.href === '/admin'
@@ -272,7 +292,7 @@ export default function AdminLayout({
           <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-sm font-medium text-gray-900">{user?.name}</div>
-              <div className="text-xs text-gray-500">{user?.role === 'PLATFORM_ADMIN' ? 'Platform Admin' : 'Hotel Admin'}</div>
+              <div className="text-xs text-gray-500">{user?.role === 'HOTEL_STAFF' ? 'Hotel Staff' : 'Hotel Admin'}</div>
             </div>
             <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-semibold text-sm">
               {user?.name?.charAt(0)?.toUpperCase() || 'A'}

@@ -13,7 +13,7 @@ interface User {
   email: string;
   name: string;
   phone?: string;
-  role: 'GUEST' | 'HOTEL_ADMIN' | 'PLATFORM_ADMIN';
+  role: 'GUEST' | 'HOTEL_ADMIN' | 'HOTEL_STAFF' | 'PLATFORM_ADMIN';
   avatarUrl?: string;
   hotelId?: string;
 }
@@ -40,6 +40,24 @@ interface RegisterData {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+type GraphQLPayload<T = any> = {
+  data?: T;
+  errors?: Array<{ message?: string }>;
+};
+
+async function parseGraphQLResponse<T = any>(response: Response): Promise<GraphQLPayload<T>> {
+  const raw = await response.text();
+  if (!raw) {
+    return { errors: [{ message: 'Empty response from server' }] };
+  }
+
+  try {
+    return JSON.parse(raw) as GraphQLPayload<T>;
+  } catch {
+    return { errors: [{ message: 'Invalid response from server' }] };
+  }
+}
 
 // Use same-origin proxy to avoid CORS/cross-origin issues (e.g. in Codespaces)
 const API_URL = '/api/graphql';
@@ -74,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }),
         });
 
-        const { data, errors } = await response.json();
+        const { data, errors } = await parseGraphQLResponse<{ me: User }>(response);
 
         if (errors || !data?.me) {
           localStorage.removeItem('accessToken');
@@ -121,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
       });
 
-      const { data, errors } = await response.json();
+      const { data, errors } = await parseGraphQLResponse<any>(response);
 
       if (errors) {
         return { success: false, message: errors[0]?.message || 'Login failed' };
@@ -172,7 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
       });
 
-      const { data: responseData, errors } = await response.json();
+      const { data: responseData, errors } = await parseGraphQLResponse<any>(response);
 
       if (errors) {
         return { success: false, message: errors[0]?.message || 'Registration failed' };
@@ -254,7 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }),
       });
 
-      const { data, errors } = await response.json();
+      const { data, errors } = await parseGraphQLResponse<any>(response);
 
       if (errors || !data?.refreshToken?.success) {
         await logout();

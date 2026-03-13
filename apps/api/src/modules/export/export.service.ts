@@ -257,16 +257,48 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
       `# Get your API key from the admin dashboard: /admin/api-keys\n` +
       `NEXT_PUBLIC_API_URL=${apiUrl}\n` +
       `NEXT_PUBLIC_HOTEL_ID=${hotelId}\n` +
-      `API_KEY=bsk_your_api_key_here\n`,
+      `API_KEY=bsk_your_api_key_here\n` +
+      `NEXT_PUBLIC_ADMIN_PATH=/admin\n`,
       { name: `${slug}-starter/.env.local` },
     );
 
     // .env.example
     archive.append(
-      `NEXT_PUBLIC_API_URL=\n` +
-      `NEXT_PUBLIC_HOTEL_ID=\n` +
-      `API_KEY=\n`,
+      `# Public API base URL (no trailing slash)\n` +
+      `NEXT_PUBLIC_API_URL=https://api.bluestay.in\n` +
+      `\n` +
+      `# Hotel ID for this website (provided by BlueStay)\n` +
+      `NEXT_PUBLIC_HOTEL_ID=hotel_xxxxxxxxx\n` +
+      `\n` +
+      `# Hotel-scoped API key (never commit real value)\n` +
+      `API_KEY=bsk_xxxxxxxxxxxxxxxxxxxxxxxxx\n` +
+      `\n` +
+      `# Admin route path on hotel domain\n` +
+      `NEXT_PUBLIC_ADMIN_PATH=/admin\n`,
       { name: `${slug}-starter/.env.example` },
+    );
+
+    // Client handoff guide
+    archive.append(
+      `# Client Handoff Guide\n\n` +
+      `This starter is safe to share with a hotel client. It does not include BlueStay database credentials.\n\n` +
+      `## What to Share\n` +
+      `- Source code in this package\n` +
+      `- A hotel-scoped API key\n` +
+      `- The hotel's own HOTEL_ID\n\n` +
+      `## What Not to Share\n` +
+      `- Platform database URL\n` +
+      `- Redis credentials\n` +
+      `- Platform admin JWT secrets\n\n` +
+      `## Setup\n` +
+      `1. Copy .env.example to .env.local\n` +
+      `2. Fill NEXT_PUBLIC_API_URL, NEXT_PUBLIC_HOTEL_ID, API_KEY\n` +
+      `3. Run npm install\n` +
+      `4. Run npm run dev\n\n` +
+      `## Admin Access\n` +
+      `- Hotel admin panel path: /admin\n` +
+      `- On custom domain (e.g. radhikaresort.in/admin), only that hotel's users should have access\n`,
+      { name: `${slug}-starter/CLIENT_HANDOFF.md` },
     );
 
     // tsconfig.json

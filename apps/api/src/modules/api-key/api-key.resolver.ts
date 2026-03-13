@@ -1,5 +1,5 @@
-import { Resolver, Query, Mutation, Args, ID } from '@nestjs/graphql';
-import { UseGuards } from '@nestjs/common';
+import { Resolver, Query, Mutation, Args, ID, Context } from '@nestjs/graphql';
+import { UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiKeyService } from './api-key.service';
 import { ApiKeyType, GeneratedApiKey, ApiKeyDeleteResult } from './entities/api-key.entity';
 import { CreateApiKeyInput, UpdateApiKeyInput } from './dto/api-key.input';
@@ -10,7 +10,7 @@ import { TenantGuard } from '../../common/guards/tenant.guard';
 
 @Resolver()
 @UseGuards(GqlAuthGuard, RolesGuard, TenantGuard)
-@Roles('HOTEL_ADMIN', 'PLATFORM_ADMIN')
+@Roles('HOTEL_ADMIN')
 export class ApiKeyResolver {
   constructor(private readonly apiKeyService: ApiKeyService) {}
 
@@ -21,7 +21,23 @@ export class ApiKeyResolver {
   async generateApiKey(
     @Args('input') input: CreateApiKeyInput,
     @GqlCurrentUser() user: any,
+    @Context() context: any,
   ): Promise<GeneratedApiKey> {
+    if (!user?.hotelId || input.hotelId !== user.hotelId) {
+      throw new ForbiddenException('You can only generate API keys for your own hotel');
+    }
+
+    const req = context?.req;
+    const origin = String(req?.headers?.origin || req?.headers?.referer || '').toLowerCase();
+    if (
+      origin.includes('://bluestay.in') ||
+      origin.includes('://www.bluestay.in')
+    ) {
+      throw new ForbiddenException(
+        'API key creation is disabled on BlueStay admin. Please contact BlueStay team for custom website access.',
+      );
+    }
+
     return this.apiKeyService.generateKey(input, user.id);
   }
 
@@ -31,8 +47,12 @@ export class ApiKeyResolver {
   })
   async listApiKeys(
     @Args('hotelId', { type: () => ID }) hotelId: string,
+    @GqlCurrentUser() user: any,
   ): Promise<ApiKeyType[]> {
-    return this.apiKeyService.listKeys(hotelId);
+    if (!user?.hotelId || hotelId !== user.hotelId) {
+      throw new ForbiddenException('You can only view API keys for your own hotel');
+    }
+    return this.apiKeyService.listKeys(user.hotelId);
   }
 
   @Mutation(() => ApiKeyType, {
@@ -43,6 +63,9 @@ export class ApiKeyResolver {
     @Args('input') input: UpdateApiKeyInput,
     @GqlCurrentUser() user: any,
   ): Promise<ApiKeyType> {
+    if (!user?.hotelId) {
+      throw new ForbiddenException('User is not associated with any hotel');
+    }
     return this.apiKeyService.updateKey(input, user.hotelId);
   }
 
@@ -54,6 +77,9 @@ export class ApiKeyResolver {
     @Args('keyId', { type: () => ID }) keyId: string,
     @GqlCurrentUser() user: any,
   ): Promise<ApiKeyDeleteResult> {
+    if (!user?.hotelId) {
+      throw new ForbiddenException('User is not associated with any hotel');
+    }
     return this.apiKeyService.revokeKey(keyId, user.hotelId);
   }
 
@@ -65,6 +91,9 @@ export class ApiKeyResolver {
     @Args('keyId', { type: () => ID }) keyId: string,
     @GqlCurrentUser() user: any,
   ): Promise<ApiKeyDeleteResult> {
+    if (!user?.hotelId) {
+      throw new ForbiddenException('User is not associated with any hotel');
+    }
     return this.apiKeyService.deleteKey(keyId, user.hotelId);
   }
 
@@ -75,7 +104,23 @@ export class ApiKeyResolver {
   async rotateApiKey(
     @Args('keyId', { type: () => ID }) keyId: string,
     @GqlCurrentUser() user: any,
+    @Context() context: any,
   ): Promise<GeneratedApiKey> {
+    if (!user?.hotelId) {
+      throw new ForbiddenException('User is not associated with any hotel');
+    }
+
+    const req = context?.req;
+    const origin = String(req?.headers?.origin || req?.headers?.referer || '').toLowerCase();
+    if (
+      origin.includes('://bluestay.in') ||
+      origin.includes('://www.bluestay.in')
+    ) {
+      throw new ForbiddenException(
+        'API key rotation is disabled on BlueStay admin. Please contact BlueStay team for custom website access.',
+      );
+    }
+
     return this.apiKeyService.rotateKey(keyId, user.hotelId);
   }
 }

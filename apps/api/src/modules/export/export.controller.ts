@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Res, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Param, Res, UseGuards, Req, ForbiddenException } from '@nestjs/common';
 import type { Response, Request } from 'express';
 import { ExportService } from './export.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -13,11 +13,28 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 export class ExportController {
   constructor(private readonly exportService: ExportService) {}
 
+  private assertHotelAccess(req: Request, hotelId: string) {
+    const user: any = req.user;
+    if (!user) {
+      throw new ForbiddenException('Authentication required');
+    }
+
+    if (user.role === 'PLATFORM_ADMIN') {
+      return;
+    }
+
+    if (!user.hotelId || user.hotelId !== hotelId) {
+      throw new ForbiddenException('You can only export source code for your own hotel');
+    }
+  }
+
   @Get(':hotelId/site.zip')
   async downloadSiteZip(
     @Param('hotelId') hotelId: string,
+    @Req() req: Request,
     @Res() res: Response,
   ) {
+    this.assertHotelAccess(req, hotelId);
     const { stream, filename } = await this.exportService.buildSiteZip(hotelId);
 
     res.set({
@@ -34,6 +51,7 @@ export class ExportController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
+    this.assertHotelAccess(req, hotelId);
     const apiUrl = `${req.protocol}://${req.get('host')}`;
     const { stream, filename } = await this.exportService.buildStarterKit(hotelId, apiUrl);
 
