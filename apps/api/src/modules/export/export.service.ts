@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as archiver from 'archiver';
 import { PassThrough } from 'stream';
+import { createHash } from 'crypto';
 
 /**
  * Generates a self-contained static-site ZIP for a hotel.
@@ -10,8 +11,49 @@ import { PassThrough } from 'stream';
 @Injectable()
 export class ExportService {
   private readonly logger = new Logger(ExportService.name);
+  private readonly exportVersion = process.env.npm_package_version || '1.0.0';
 
   constructor(private readonly prisma: PrismaService) {}
+
+  private sha256(content: string): string {
+    return createHash('sha256').update(content).digest('hex');
+  }
+
+  private appendTextFile(
+    archive: any,
+    fileChecksums: Array<{ path: string; sha256: string; size: number }>,
+    path: string,
+    content: string,
+  ) {
+    archive.append(content, { name: path });
+    fileChecksums.push({
+      path,
+      sha256: this.sha256(content),
+      size: Buffer.byteLength(content, 'utf8'),
+    });
+  }
+
+  private appendManifest(
+    archive: any,
+    path: string,
+    payload: {
+      exportType: 'static-site' | 'starter-kit';
+      hotelId: string;
+      hotelSlug: string;
+      generatedAt: string;
+      fileChecksums: Array<{ path: string; sha256: string; size: number }>;
+    },
+  ) {
+    const manifest = JSON.stringify(
+      {
+        version: this.exportVersion,
+        ...payload,
+      },
+      null,
+      2,
+    );
+    archive.append(manifest, { name: path });
+  }
 
   /**
    * Build ZIP for a hotel and return a readable stream
@@ -47,21 +89,37 @@ export class ExportService {
 
     archive.pipe(passthrough);
 
+    const generatedAt = new Date().toISOString();
+    const fileChecksums: Array<{ path: string; sha256: string; size: number }> = [];
+
+    const cssContent = this.generateCSS(hotel.themeConfig as any);
+    const indexContent = this.generateIndex(hotel);
+    const roomsContent = this.generateRoomsPage(hotel);
+    const reviewsContent = this.generateReviewsPage(hotel);
+    const hotelJsonContent = JSON.stringify({ hotel, exportedAt: generatedAt }, null, 2);
+
     // CSS
-    archive.append(this.generateCSS(hotel.themeConfig as any), { name: 'css/style.css' });
+    this.appendTextFile(archive, fileChecksums, 'css/style.css', cssContent);
 
     // Main page
-    archive.append(this.generateIndex(hotel), { name: 'index.html' });
+    this.appendTextFile(archive, fileChecksums, 'index.html', indexContent);
 
     // Rooms page
-    archive.append(this.generateRoomsPage(hotel), { name: 'rooms.html' });
+    this.appendTextFile(archive, fileChecksums, 'rooms.html', roomsContent);
 
     // Reviews page
-    archive.append(this.generateReviewsPage(hotel), { name: 'reviews.html' });
+    this.appendTextFile(archive, fileChecksums, 'reviews.html', reviewsContent);
 
     // Hotel data as JSON (for custom integrations)
-    archive.append(JSON.stringify({ hotel, exportedAt: new Date().toISOString() }, null, 2), {
-      name: 'data/hotel.json',
+    this.appendTextFile(archive, fileChecksums, 'data/hotel.json', hotelJsonContent);
+
+    // Export metadata and checksums for handoff integrity
+    this.appendManifest(archive, 'metadata/export-manifest.json', {
+      exportType: 'static-site',
+      hotelId,
+      hotelSlug: hotel.slug,
+      generatedAt,
+      fileChecksums,
     });
 
     await archive.finalize();
@@ -228,9 +286,11 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
     archive.pipe(passthrough);
 
     const slug = hotel.slug;
+    const generatedAt = new Date().toISOString();
+    const fileChecksums: Array<{ path: string; sha256: string; size: number }> = [];
 
     // package.json
-    archive.append(JSON.stringify({
+    const packageJson = JSON.stringify({
       name: `${slug}-website`,
       version: '1.0.0',
       private: true,
@@ -249,21 +309,21 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
         '@types/react': '^18.2.0',
         '@types/node': '^20.11.0',
       },
-    }, null, 2), { name: `${slug}-starter/package.json` });
+    }, null, 2);
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/package.json`, packageJson);
 
     // .env.local
-    archive.append(
+    const envLocal =
       `# BlueStay API Configuration\n` +
       `# Get your API key from the admin dashboard: /admin/api-keys\n` +
       `NEXT_PUBLIC_API_URL=${apiUrl}\n` +
       `NEXT_PUBLIC_HOTEL_ID=${hotelId}\n` +
       `API_KEY=bsk_your_api_key_here\n` +
-      `NEXT_PUBLIC_ADMIN_PATH=/admin\n`,
-      { name: `${slug}-starter/.env.local` },
-    );
+      `NEXT_PUBLIC_ADMIN_PATH=/admin\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/.env.local`, envLocal);
 
     // .env.example
-    archive.append(
+    const envExample =
       `# Public API base URL (no trailing slash)\n` +
       `NEXT_PUBLIC_API_URL=https://api.bluestay.in\n` +
       `\n` +
@@ -274,12 +334,11 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
       `API_KEY=bsk_xxxxxxxxxxxxxxxxxxxxxxxxx\n` +
       `\n` +
       `# Admin route path on hotel domain\n` +
-      `NEXT_PUBLIC_ADMIN_PATH=/admin\n`,
-      { name: `${slug}-starter/.env.example` },
-    );
+      `NEXT_PUBLIC_ADMIN_PATH=/admin\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/.env.example`, envExample);
 
     // Client handoff guide
-    archive.append(
+    const handoffGuide =
       `# Client Handoff Guide\n\n` +
       `This starter is safe to share with a hotel client. It does not include BlueStay database credentials.\n\n` +
       `## What to Share\n` +
@@ -297,12 +356,11 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
       `4. Run npm run dev\n\n` +
       `## Admin Access\n` +
       `- Hotel admin panel path: /admin\n` +
-      `- On custom domain (e.g. radhikaresort.in/admin), only that hotel's users should have access\n`,
-      { name: `${slug}-starter/CLIENT_HANDOFF.md` },
-    );
+      `- On custom domain (e.g. radhikaresort.in/admin), only that hotel's users should have access\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/CLIENT_HANDOFF.md`, handoffGuide);
 
     // tsconfig.json
-    archive.append(JSON.stringify({
+    const tsconfigJson = JSON.stringify({
       compilerOptions: {
         target: 'es5',
         lib: ['dom', 'dom.iterable', 'esnext'],
@@ -321,18 +379,18 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
       },
       include: ['next-env.d.ts', '**/*.ts', '**/*.tsx'],
       exclude: ['node_modules'],
-    }, null, 2), { name: `${slug}-starter/tsconfig.json` });
+    }, null, 2);
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/tsconfig.json`, tsconfigJson);
 
     // next.config.js
-    archive.append(
+    const nextConfigJs =
       `/** @type {import('next').NextConfig} */\n` +
       `const nextConfig = {};\n` +
-      `module.exports = nextConfig;\n`,
-      { name: `${slug}-starter/next.config.js` },
-    );
+      `module.exports = nextConfig;\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/next.config.js`, nextConfigJs);
 
     // lib/api.ts — API client
-    archive.append(
+    const apiClientTs =
       `/**\n` +
       ` * BlueStay API Client\n` +
       ` * Fetches hotel data via the BlueStay GraphQL API using your API key.\n` +
@@ -354,12 +412,11 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
       `  if (json.errors) throw new Error(json.errors[0].message);\n` +
       `  return json.data;\n` +
       `}\n\n` +
-      `export { HOTEL_ID };\n`,
-      { name: `${slug}-starter/src/lib/api.ts` },
-    );
+      `export { HOTEL_ID };\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/src/lib/api.ts`, apiClientTs);
 
     // app/layout.tsx
-    archive.append(
+    const appLayoutTsx =
       `import './globals.css';\n\n` +
       `export const metadata = {\n` +
       `  title: '${hotel.name}',\n` +
@@ -371,19 +428,17 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
       `      <body>{children}</body>\n` +
       `    </html>\n` +
       `  );\n` +
-      `}\n`,
-      { name: `${slug}-starter/src/app/layout.tsx` },
-    );
+      `}\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/src/app/layout.tsx`, appLayoutTsx);
 
     // app/globals.css
-    archive.append(
+    const appGlobalsCss =
       `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n\n` +
-      `body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }\n`,
-      { name: `${slug}-starter/src/app/globals.css` },
-    );
+      `body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/src/app/globals.css`, appGlobalsCss);
 
     // app/page.tsx — home page
-    archive.append(
+    const appPageTsx =
       `import { query, HOTEL_ID } from '@/lib/api';\n\n` +
       `async function getHotel() {\n` +
       `  const data = await query(\`\n` +
@@ -435,12 +490,11 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
       `      </footer>\n` +
       `    </main>\n` +
       `  );\n` +
-      `}\n`,
-      { name: `${slug}-starter/src/app/page.tsx` },
-    );
+      `}\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/src/app/page.tsx`, appPageTsx);
 
     // README.md
-    archive.append(
+    const readmeMd =
       `# ${hotel.name} — Website\n\n` +
       `A Next.js website powered by BlueStay API.\n\n` +
       `## Quick Start\n\n` +
@@ -463,9 +517,17 @@ footer { background: #111827; color: #9ca3af; padding: 32px 0; text-align: cente
       `## Deployment\n\n` +
       `Deploy to Vercel, Netlify, or any Node.js host:\n\n` +
       `\`\`\`bash\nnpm run build\nnpm start\n\`\`\`\n\n` +
-      `Set the same environment variables on your hosting platform.\n`,
-      { name: `${slug}-starter/README.md` },
-    );
+      `Set the same environment variables on your hosting platform.\n`;
+    this.appendTextFile(archive, fileChecksums, `${slug}-starter/README.md`, readmeMd);
+
+    // Export metadata and checksums for handoff integrity
+    this.appendManifest(archive, `${slug}-starter/metadata/export-manifest.json`, {
+      exportType: 'starter-kit',
+      hotelId,
+      hotelSlug: slug,
+      generatedAt,
+      fileChecksums,
+    });
 
     await archive.finalize();
 

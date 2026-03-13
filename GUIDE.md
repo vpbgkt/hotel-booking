@@ -749,6 +749,7 @@ The ZIP contains a working Next.js app with:
 - API client pre-configured with your hotel ID and API URL
 - Home page with hotel info and room listing
 - Ready to deploy to Vercel, Netlify, or any Node.js host
+- `metadata/export-manifest.json` with export version, generated timestamp, and SHA256 checksums
 
 ---
 
