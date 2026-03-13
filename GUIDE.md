@@ -734,6 +734,17 @@ Download a pre-configured Next.js starter project for your hotel:
 GET /api/export/:hotelId/starter-kit
 ```
 
+Or from UI: `Admin → Settings → Client Handoff / Source Export`.
+
+Download options:
+- `Starter Kit`: Next.js source package for hotel website + `.env.example`
+- `Static ZIP`: static HTML/CSS export
+
+Safe sharing checklist:
+- Share: starter/static ZIP + hotel-scoped API key + hotel ID
+- Do not share: platform DB URL, Redis URL, JWT secrets
+- Hotel admin for custom domain is available at `https://<hotel-domain>/admin` (example: `https://radhikaresort.in/admin`)
+
 The ZIP contains a working Next.js app with:
 - API client pre-configured with your hotel ID and API URL
 - Home page with hotel info and room listing

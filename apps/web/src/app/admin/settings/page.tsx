@@ -28,6 +28,8 @@ import {
   Trash2,
   Plus,
   Star as StarIcon,
+  Download,
+  FileCode,
 } from 'lucide-react';
 
 interface HotelData {
@@ -95,9 +97,11 @@ const SET_PRIMARY_DOMAIN = gql`
 `;
 
 export default function AdminSettingsPage() {
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
   const hotelId = user?.hotelId;
   const [saved, setSaved] = useState(false);
+  const [exporting, setExporting] = useState<'starter' | 'static' | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, loading, error } = useQuery<any>(GET_HOTEL_BY_ID, {
@@ -173,6 +177,51 @@ export default function AdminSettingsPage() {
 
   const updateField = (field: string, value: unknown) => {
     setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const downloadExport = async (type: 'starter' | 'static') => {
+    if (!hotelId || !accessToken) {
+      setExportError('Please login again to download export packages.');
+      return;
+    }
+
+    setExportError(null);
+    setExporting(type);
+
+    try {
+      const endpoint = type === 'starter' ? 'starter-kit' : 'site.zip';
+      const configuredApiBase = process.env.NEXT_PUBLIC_API_URL || window.location.origin;
+      const normalizedBase = configuredApiBase.replace(/\/graphql\/?$/, '').replace(/\/$/, '');
+      const response = await fetch(`${normalizedBase}/api/export/${hotelId}/${endpoint}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `Download failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') || '';
+      const filenameMatch = disposition.match(/filename="?([^\"]+)"?/i);
+      const fallback = type === 'starter' ? 'hotel-starter-kit.zip' : 'hotel-site.zip';
+      const filename = filenameMatch?.[1] || fallback;
+
+      const objectUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(objectUrl);
+    } catch (err: any) {
+      setExportError(err?.message || 'Failed to download export package');
+    } finally {
+      setExporting(null);
+    }
   };
 
   if (!hotelId) {
@@ -535,6 +584,74 @@ export default function AdminSettingsPage() {
 
       {/* Domain Management Section */}
       <DomainManagement hotelId={hotelId} />
+
+      {/* Source Export Section */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FileCode className="w-4 h-4 text-brand-600" />
+            Client Handoff / Source Export
+          </CardTitle>
+          <p className="text-sm text-gray-500 mt-1">
+            Download ready-to-share packages for your hotel website. These exports do not include platform database credentials.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h4 className="font-medium text-gray-900">Next.js Starter Kit</h4>
+              <p className="text-sm text-gray-500 mt-1">
+                Share this with radhikaresort.in to run their own site frontend with hotel-scoped API access.
+              </p>
+              <Button
+                type="button"
+                className="mt-3"
+                onClick={() => downloadExport('starter')}
+                disabled={exporting !== null}
+              >
+                {exporting === 'starter' ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Download Starter Kit
+              </Button>
+            </div>
+
+            <div className="rounded-lg border border-gray-200 p-4">
+              <h4 className="font-medium text-gray-900">Static Site Export</h4>
+              <p className="text-sm text-gray-500 mt-1">
+                Download static HTML/CSS export for quick deployment or backup sharing.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3"
+                onClick={() => downloadExport('static')}
+                disabled={exporting !== null}
+              >
+                {exporting === 'static' ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Download Static ZIP
+              </Button>
+            </div>
+          </div>
+
+          {exportError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" />
+              {exportError}
+            </div>
+          )}
+
+          <div className="rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs text-blue-700">
+            Share only the downloaded package and hotel-scoped API key. Do not share platform database URL, Redis URL, or JWT secrets.
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
