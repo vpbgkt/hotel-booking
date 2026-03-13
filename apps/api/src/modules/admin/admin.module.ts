@@ -5,10 +5,17 @@ import { PlatformAdminResolver } from './platform-admin.resolver';
 import { PlatformAdminService } from './platform-admin.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RedisModule } from '../redis/redis.module';
+import { TenantGuard } from '../../common/guards/tenant.guard';
 
 @Module({
   imports: [PrismaModule, RedisModule],
-  providers: [AdminResolver, AdminService, PlatformAdminResolver, PlatformAdminService],
+  providers: [
+    TenantGuard,
+    AdminResolver,
+    AdminService,
+    PlatformAdminResolver,
+    PlatformAdminService,
+  ],
   exports: [AdminService, PlatformAdminService],
 })
 export class AdminModule {}
