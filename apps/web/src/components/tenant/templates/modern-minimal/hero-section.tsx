@@ -1,10 +1,5 @@
 'use client';
 
-/**
- * Modern Minimal Template — Hero Section
- * Clean aesthetic with bold typography, asymmetric layout, floating search card.
- */
-
 import Image from 'next/image';
 import { Star, MapPin, Shield, Award } from 'lucide-react';
 import { sanitizeColor, sanitizeImageUrl, sanitizeText } from '@/lib/security/sanitize';
@@ -16,105 +11,66 @@ export function ModernMinimalHero({
   checkIn, checkOut, guests,
   onCheckInChange, onCheckOutChange, onGuestsChange,
 }: HeroSectionProps) {
-  const primary = sanitizeColor(theme.primaryColor, '#2563eb');
-  const secondary = sanitizeColor(theme.secondaryColor, '#1e40af');
   const heroImg = sanitizeImageUrl(hotel.heroImageUrl);
 
   return (
     <>
-      <section className="relative min-h-[85vh] flex items-center">
-        {/* Split layout: left text, right image */}
-        <div className="absolute inset-0 grid grid-cols-1 lg:grid-cols-2">
-          {/* Left — gradient background */}
-          <div
-            className="hidden lg:block"
-            style={{ background: `linear-gradient(160deg, ${primary}08, ${primary}15)` }}
-          />
-          {/* Right — hero image */}
-          <div className="relative">
-            {heroImg ? (
-              <Image
-                src={heroImg}
-                alt={sanitizeText(hotel.name)}
-                fill
-                className="object-cover"
-                priority
-              />
-            ) : (
-              <div
-                className="absolute inset-0"
-                style={{ background: `linear-gradient(135deg, ${primary}, ${secondary})` }}
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent lg:block hidden" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent lg:hidden" />
-          </div>
+      <section className="relative w-full min-h-screen bg-black text-white flex flex-col justify-end pt-32 pb-24 px-8 md:px-16 lg:px-32">
+        <div className="absolute inset-x-0 top-0 h-[60vh] md:h-[70vh] bg-zinc-900 border-b-8 border-white">
+          {heroImg && (
+            <Image
+              src={heroImg}
+              alt={sanitizeText(hotel.name)}
+              fill
+              className="object-cover grayscale contrast-125 rounded-none"
+              priority
+            />
+          )}
         </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full py-20">
-          <div className="max-w-xl">
-            {hotel.isVerified && (
-              <div
-                className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wider uppercase px-3 py-1.5 rounded-full mb-6 border"
-                style={{
-                  color: primary,
-                  borderColor: `${primary}30`,
-                  backgroundColor: `${primary}08`,
-                }}
-              >
-                <Shield className="w-3.5 h-3.5" />
-                Verified
-              </div>
-            )}
-
-            <h1
-              className="text-5xl md:text-6xl lg:text-7xl font-light tracking-tight text-gray-900 lg:text-gray-900 text-white mb-4"
-              style={{ fontFamily: theme.fontFamily }}
-            >
-              {sanitizeText(hotel.name)}
-            </h1>
-
-            {hotel.tagline && (
-              <p className="text-xl text-gray-500 lg:text-gray-500 text-white/80 font-light mb-6 max-w-md">
-                {sanitizeText(hotel.tagline)}
-              </p>
-            )}
-
-            <div className="flex items-center gap-5 mb-8 text-sm">
-              <div className="flex items-center gap-1">
-                {Array.from({ length: hotel.starRating }).map((_, i) => (
-                  <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                ))}
-              </div>
-              {hotel.averageRating && (
-                <span className="flex items-center gap-1.5 text-gray-600 lg:text-gray-600 text-white/80">
-                  <Award className="w-4 h-4" />
-                  {hotel.averageRating.toFixed(1)}
-                  <span className="text-gray-400">({hotel.reviewCount})</span>
-                </span>
-              )}
-              <span className="flex items-center gap-1.5 text-gray-600 lg:text-gray-600 text-white/80">
-                <MapPin className="w-4 h-4" />
-                {sanitizeText(hotel.city)}
-              </span>
+        
+        <div className="relative z-10 w-full mt-[50vh] md:mt-[60vh] bg-black p-8 md:p-16 border-l-8 border-white">
+          {hotel.isVerified && (
+            <div className="mb-8 inline-block bg-white text-black px-4 py-2 text-2xl font-bold tracking-tighter uppercase rounded-none">
+              <Shield className="inline w-6 h-6 mr-2" /> Verified
             </div>
+          )}
 
-            {hotel.startingPrice && (
-              <div className="flex items-baseline gap-1 text-gray-900 lg:text-gray-900 text-white">
-                <span className="text-sm font-light text-gray-400 lg:text-gray-400 text-white/60">from</span>
-                <span className="text-4xl font-extralight tracking-tight">
-                  ₹{hotel.startingPrice.toLocaleString('en-IN')}
-                </span>
-                <span className="text-sm font-light text-gray-400 lg:text-gray-400 text-white/60">/ night</span>
-              </div>
+          <h1 className="text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter uppercase leading-none mb-8 break-words rounded-none">
+            {sanitizeText(hotel.name)}
+          </h1>
+
+          {hotel.tagline && (
+            <p className="text-2xl md:text-4xl font-bold tracking-tighter text-zinc-400 mb-12 uppercase max-w-4xl rounded-none">
+              {sanitizeText(hotel.tagline)}
+            </p>
+          )}
+
+          <div className="flex flex-col md:flex-row md:items-center gap-8 text-xl font-bold tracking-tighter uppercase rounded-none">
+            <div className="flex items-center gap-2 bg-white text-black px-4 py-2 rounded-none">
+              <Star className="w-6 h-6 fill-black" /> {hotel.starRating} STARS
+            </div>
+            {hotel.averageRating && (
+              <span className="flex items-center gap-2 border-2 border-white px-4 py-2 rounded-none">
+                <Award className="w-6 h-6" />
+                {hotel.averageRating.toFixed(1)} / {hotel.reviewCount} REVS
+              </span>
             )}
+            <span className="flex items-center gap-2 border-2 border-white px-4 py-2 rounded-none">
+              <MapPin className="w-6 h-6" />
+              {sanitizeText(hotel.city)}
+            </span>
           </div>
+
+          {hotel.startingPrice && (
+            <div className="mt-16 text-5xl md:text-7xl font-black tracking-tighter rounded-none">
+              ₹{hotel.startingPrice.toLocaleString('en-IN')} <span className="text-2xl text-zinc-500 uppercase">/ night</span>
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Floating search card */}
-      <section className="relative z-20 -mt-12">
-        <div className="max-w-4xl mx-auto px-4">
+      <section className="w-full bg-white text-black border-t-8 border-black p-8 md:p-16 relative z-20 rounded-none">
+        <div className="max-w-7xl mx-auto rounded-none">
           <SearchWidget
             theme={theme}
             checkIn={checkIn}

@@ -1,141 +1,99 @@
 'use client';
 
-/**
- * Heritage Boutique Template — Rooms Section
- * Storybook-style cards with warm tones, serif headings, ornamental accents.
- */
-
 import Image from 'next/image';
 import Link from 'next/link';
 import { Users, Clock, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { sanitizeColor, sanitizeImageUrl, sanitizeText } from '@/lib/security/sanitize';
 import { getAmenityLabel } from '../shared/amenities';
 import type { RoomsSectionProps } from '../types';
 
 export function HeritageBoutiqueRooms({ hotel, theme }: RoomsSectionProps) {
-  const primary = sanitizeColor(theme.primaryColor, '#92400e');
-  const accent = sanitizeColor(theme.accentColor, '#b45309');
+  const accent = sanitizeColor(theme.accentColor, '#8B4513');
   const activeRooms = hotel.roomTypes?.filter((r) => r.isActive) || [];
 
   if (activeRooms.length === 0) return null;
 
   return (
-    <section className="py-20 md:py-28 bg-stone-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Section heading with ornament */}
-        <div className="text-center mb-16">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="w-12 h-px" style={{ backgroundColor: accent }} />
-            <div className="w-2 h-2 rotate-45 border" style={{ borderColor: accent }} />
-            <div className="w-12 h-px" style={{ backgroundColor: accent }} />
+    <section className="py-32 bg-stone-50 font-serif border-[16px] md:border-[32px] border-double border-stone-300 border-t-0 p-8">
+      <div className="max-w-7xl mx-auto">
+        
+        <div className="flex flex-col items-center text-center mb-24 w-full">
+          <div className="flex items-center gap-6 mb-8 text-stone-400 justify-center">
+            <div className="w-24 h-px bg-stone-300"></div>
+            <span className="text-2xl">♦</span>
+            <div className="w-24 h-px bg-stone-300"></div>
           </div>
-          <h2
-            className="text-3xl md:text-4xl text-stone-800 mb-3"
-            style={{ fontFamily: "'Playfair Display', 'Lora', serif", fontWeight: 400 }}
-          >
-            Our Rooms & Suites
+          <h2 className="text-5xl md:text-7xl font-normal text-stone-800 mb-8 break-words" style={{ color: accent }}>
+            Chambers & Suites
           </h2>
-          <p className="text-stone-500 max-w-lg mx-auto" style={{ fontFamily: "'Lora', serif" }}>
-            Each room tells a story — steeped in tradition, designed for comfort.
+          <p className="text-xl md:text-2xl text-stone-500 italic max-w-2xl mx-auto leading-relaxed break-words">
+            Every room narrates a tale of a bygone era, preserving classic charm meticulously interlaced with modern comforts.
           </p>
         </div>
 
-        {/* Room cards — storybook-style grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {activeRooms.slice(0, 4).map((room) => {
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-16 md:gap-24 bg-stone-50">
+          {activeRooms.map((room) => {
             const roomImg = sanitizeImageUrl(room.images?.[0]);
             return (
-              <div
-                key={room.id}
-                className="bg-white border border-stone-200 overflow-hidden group hover:shadow-lg transition-shadow duration-500"
-              >
-                {/* Image with warm overlay on hover */}
-                <div className="relative aspect-[16/10] overflow-hidden">
-                  {roomImg ? (
-                    <Image
-                      src={roomImg}
-                      alt={sanitizeText(room.name)}
-                      fill
-                      className="object-cover group-hover:scale-[1.03] transition-transform duration-700"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-amber-50 to-stone-100" />
-                  )}
-                  {hotel.bookingModel === 'BOTH' && room.basePriceHourly && (
-                    <div className="absolute top-3 left-3 bg-white/90 text-xs font-medium px-3 py-1 flex items-center gap-1 text-stone-700">
-                      <Clock className="w-3 h-3" /> Hourly Available
-                    </div>
-                  )}
-                  {/* Warm gradient overlay at bottom */}
-                  <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-black/20 to-transparent" />
+              <div key={room.id} className="group flex flex-col bg-stone-100 border-x border-b border-stone-300 relative pt-12 min-h-[600px]">
+                <div className="absolute top-0 left-0 right-0 h-3 bg-stone-300 stripe-pattern"></div>
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-stone-50 border border-stone-300 px-8 py-3 text-sm tracking-[0.3em] uppercase text-stone-600 shadow-sm whitespace-nowrap">
+                  {room.maxGuests} Guests
                 </div>
 
-                {/* Content */}
-                <div className="p-6">
-                  <h3
-                    className="text-xl text-stone-800 mb-2"
-                    style={{ fontFamily: "'Playfair Display', serif", fontWeight: 500 }}
-                  >
+                <div className="px-8 md:px-12 pt-8 pb-12 flex-grow flex flex-col items-center text-center bg-stone-100">
+                  <h3 className="text-4xl text-stone-800 mb-6 border-b border-stone-300 pb-6 w-full break-words" style={{ color: accent }}>
                     {sanitizeText(room.name)}
                   </h3>
-                  <p
-                    className="text-stone-500 text-sm mb-4 leading-relaxed line-clamp-2"
-                    style={{ fontFamily: "'Lora', serif" }}
-                  >
-                    {sanitizeText(room.description) || `A charming retreat for up to ${room.maxGuests} guests.`}
+                  
+                  <p className="text-lg text-stone-600 italic mb-10 flex-grow break-words w-full">
+                    {sanitizeText(room.description) || `Experience timeless elegance crafted for your utmost comfort.`}
                   </p>
 
-                  <div className="flex flex-wrap gap-2 mb-5">
-                    <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-50 px-2 py-1 rounded">
-                      <Users className="w-3 h-3" /> Up to {room.maxGuests}
-                    </span>
-                    {room.amenities.slice(0, 3).map((a) => (
-                      <span key={a} className="text-xs text-stone-500 bg-stone-50 px-2 py-1 rounded">
+                  <div className="flex flex-wrap justify-center gap-4 mb-12 text-sm tracking-widest uppercase text-stone-500 w-full">
+                    {room.amenities.slice(0, 4).map((a) => (
+                      <span key={a} className="border border-stone-300 px-4 py-2 bg-stone-50 whitespace-nowrap">
                         {getAmenityLabel(a)}
                       </span>
                     ))}
                   </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-stone-100">
-                    <div className="flex items-baseline gap-1">
-                      <span
-                        className="text-2xl text-stone-800"
-                        style={{ fontFamily: "'Playfair Display', serif", fontWeight: 400 }}
-                      >
-                        ₹{room.basePriceDaily.toLocaleString('en-IN')}
-                      </span>
-                      <span className="text-xs text-stone-400">/ night</span>
+                  <div className="w-full relative aspect-square md:aspect-[4/3] mb-12 border-8 border-stone-200 shadow-inner overflow-hidden p-2 bg-stone-50 rounded-full">
+                    <div className="relative w-full h-full rounded-full overflow-hidden bg-stone-200">
+                      {roomImg ? (
+                        <Image
+                          src={roomImg}
+                          alt={sanitizeText(room.name)}
+                          fill
+                          className="object-cover sepia-[0.2] group-hover:sepia-0 group-hover:scale-110 transition-all duration-700"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-stone-200" />
+                      )}
                     </div>
-                    <Link href={`/hotel/rooms/${room.id}`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-stone-300 hover:bg-stone-50 gap-1.5 text-stone-600"
-                      >
-                        Details <ArrowRight className="w-3 h-3" />
-                      </Button>
+                  </div>
+
+                  <div className="w-full flex flex-col items-center gap-8 pt-8 border-t border-dashed border-stone-400">
+                    <div className="flex flex-col items-center w-full">
+                      <span className="text-sm tracking-[0.2em] text-stone-500 uppercase mb-2 break-words">Nightly Rate</span>
+                      <span className="text-5xl text-stone-800 break-words">₹{room.basePriceDaily.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <Link href={`/hotel/rooms/${room.id}`} className="inline-flex items-center justify-center w-full py-6 bg-stone-800 text-stone-50 hover:bg-stone-900 border border-stone-900 transition-colors text-sm tracking-[0.3em] uppercase whitespace-nowrap">
+                      Inspect Details <ArrowRight className="w-5 h-5 ml-4" />
                     </Link>
                   </div>
                 </div>
+
+                {hotel.bookingModel === 'BOTH' && room.basePriceHourly && (
+                  <div className="absolute top-16 left-8 bg-stone-50 border border-stone-300 px-4 py-2 text-xs tracking-widest uppercase flex items-center gap-2 text-stone-600 shadow-md transform -rotate-2 whitespace-nowrap">
+                    <Clock className="w-4 h-4" /> Hourly
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
-
-        {activeRooms.length > 4 && (
-          <div className="text-center mt-12">
-            <Link href="/hotel/rooms">
-              <Button
-                variant="outline"
-                size="lg"
-                className="border-stone-300 text-stone-600 hover:bg-stone-100 px-8"
-              >
-                View All Rooms ({activeRooms.length})
-              </Button>
-            </Link>
-          </div>
-        )}
       </div>
     </section>
   );

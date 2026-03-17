@@ -123,7 +123,7 @@ export function TenantHeader() {
               ) : (
                 <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-lg"
-                  style={{ backgroundColor: theme.primaryColor || '#2563eb' }}
+                  
                 >
                   {hotel?.name?.charAt(0) || 'H'}
                 </div>

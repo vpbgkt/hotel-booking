@@ -21,13 +21,13 @@ const buttonVariants = cva(
       variant: {
         // Primary blue - main CTAs
         default:
-          "bg-brand-600 text-white shadow-sm hover:bg-brand-700 focus-visible:ring-brand-500",
+          "bg-primary text-white shadow-sm hover:bg-primary-700 focus-visible:ring-primary",
         // Destructive red - delete actions
         destructive:
           "bg-error-500 text-white shadow-sm hover:bg-error-600 focus-visible:ring-error-500",
         // Outlined - secondary actions
         outline:
-          "border-2 border-gray-300 bg-white text-gray-700 hover:border-brand-500 hover:text-brand-600 hover:bg-brand-50",
+          "border-2 border-gray-300 bg-white text-gray-700 hover:border-primary hover:text-primary hover:bg-primary/10",
         // Subtle background - tertiary actions
         secondary:
           "bg-gray-100 text-gray-900 hover:bg-gray-200 focus-visible:ring-gray-500",

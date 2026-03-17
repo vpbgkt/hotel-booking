@@ -145,7 +145,7 @@ export default function TenantRoomsPage() {
         }}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Rooms & Suites</h1>
+          <h1 className="text-3xl md:text-4xl font-bold font-heading mb-2">Rooms & Suites</h1>
           <p className="text-white/80">at {hotel.name}</p>
         </div>
       </div>
@@ -342,7 +342,7 @@ export default function TenantRoomsPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-gray-900">
+                          <div className="text-2xl font-bold font-heading text-gray-900">
                             ₹{(avail?.pricePerNight || room.basePriceDaily).toLocaleString('en-IN')}
                           </div>
                           <div className="text-sm text-gray-500">/night</div>
@@ -418,7 +418,7 @@ export default function TenantRoomsPage() {
                         >
                           <Button
                             className="w-full"
-                            style={{ backgroundColor: theme.primaryColor || undefined }}
+                            
                           >
                             Book Now
                           </Button>
